@@ -17,7 +17,10 @@ ASM_SRCS += \
 
 C_SRCS += \
 ../source/MCP23S17.c \
+../source/PCA2129.c \
+../source/SST25PF040C.c \
 ../source/adc.c \
+../source/can.c \
 ../source/errata_SSWF021_45.c \
 ../source/esm.c \
 ../source/gio.c \
@@ -38,7 +41,10 @@ C_SRCS += \
 
 C_DEPS += \
 ./source/MCP23S17.d \
+./source/PCA2129.d \
+./source/SST25PF040C.d \
 ./source/adc.d \
+./source/can.d \
 ./source/errata_SSWF021_45.d \
 ./source/esm.d \
 ./source/gio.d \
@@ -59,7 +65,10 @@ C_DEPS += \
 
 OBJS += \
 ./source/MCP23S17.obj \
+./source/PCA2129.obj \
+./source/SST25PF040C.obj \
 ./source/adc.obj \
+./source/can.obj \
 ./source/dabort.obj \
 ./source/errata_SSWF021_45.obj \
 ./source/esm.obj \
@@ -92,7 +101,10 @@ ASM_DEPS += \
 
 OBJS__QUOTED += \
 "source\MCP23S17.obj" \
+"source\PCA2129.obj" \
+"source\SST25PF040C.obj" \
 "source\adc.obj" \
+"source\can.obj" \
 "source\dabort.obj" \
 "source\errata_SSWF021_45.obj" \
 "source\esm.obj" \
@@ -118,7 +130,10 @@ OBJS__QUOTED += \
 
 C_DEPS__QUOTED += \
 "source\MCP23S17.d" \
+"source\PCA2129.d" \
+"source\SST25PF040C.d" \
 "source\adc.d" \
+"source\can.d" \
 "source\errata_SSWF021_45.d" \
 "source\esm.d" \
 "source\gio.d" \
@@ -146,7 +161,10 @@ ASM_DEPS__QUOTED += \
 
 C_SRCS__QUOTED += \
 "../source/MCP23S17.c" \
+"../source/PCA2129.c" \
+"../source/SST25PF040C.c" \
 "../source/adc.c" \
+"../source/can.c" \
 "../source/errata_SSWF021_45.c" \
 "../source/esm.c" \
 "../source/gio.c" \
