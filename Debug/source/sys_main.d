@@ -42,6 +42,7 @@ source/sys_main.obj: C:/Users/inovar/workspace_v9/Lowbadtest/include/spi.h
 source/sys_main.obj: C:/Users/inovar/workspace_v9/Lowbadtest/include/reg_spi.h
 source/sys_main.obj: C:/Users/inovar/workspace_v9/Lowbadtest/include/can.h
 source/sys_main.obj: C:/Users/inovar/workspace_v9/Lowbadtest/include/reg_can.h
+source/sys_main.obj: C:/Users/inovar/workspace_v9/Lowbadtest/include/PINOUT.h
 source/sys_main.obj: C:/Users/inovar/workspace_v9/Lowbadtest/include/MCP23S17.h
 source/sys_main.obj: C:/ti/ccs930/ccs/tools/compiler/ti-cgt-arm_18.12.4.LTS/include/stdlib.h
 source/sys_main.obj: C:/Users/inovar/workspace_v9/Lowbadtest/include/PCA2129.h
@@ -91,6 +92,7 @@ C:/Users/inovar/workspace_v9/Lowbadtest/include/spi.h:
 C:/Users/inovar/workspace_v9/Lowbadtest/include/reg_spi.h: 
 C:/Users/inovar/workspace_v9/Lowbadtest/include/can.h: 
 C:/Users/inovar/workspace_v9/Lowbadtest/include/reg_can.h: 
+C:/Users/inovar/workspace_v9/Lowbadtest/include/PINOUT.h: 
 C:/Users/inovar/workspace_v9/Lowbadtest/include/MCP23S17.h: 
 C:/ti/ccs930/ccs/tools/compiler/ti-cgt-arm_18.12.4.LTS/include/stdlib.h: 
 C:/Users/inovar/workspace_v9/Lowbadtest/include/PCA2129.h: 
