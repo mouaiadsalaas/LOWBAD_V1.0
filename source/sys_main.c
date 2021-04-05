@@ -720,9 +720,9 @@ void modeWarning(){
                     Fullautomaticled.count = 0;
 
                     if(Fullautomaticled.state){
-                        gioSetBit(GIO_ALIGNMENT_WARNING_LAMP_RED_PORT,GIO_ALIGNMENT_WARNING_LAMP_RED_PIN ,HIGH);//yellow
+                        gioSetBit(GIO_ALIGNMENT_WARNING_LAMP_YELLOW_PORT,GIO_ALIGNMENT_WARNING_LAMP_YELLOW_PIN ,HIGH);//yellow
                     }else{
-                        gioSetBit(GIO_ALIGNMENT_WARNING_LAMP_RED_PORT,GIO_ALIGNMENT_WARNING_LAMP_RED_PIN ,LOW);//yellow
+                        gioSetBit(GIO_ALIGNMENT_WARNING_LAMP_YELLOW_PORT,GIO_ALIGNMENT_WARNING_LAMP_YELLOW_PIN ,LOW);//yellow
                         Fullautomaticled.counter++;
                         }
                     }
@@ -773,17 +773,19 @@ void AutoHizalamaProcess(){
     }
 }
 
-void ISSprocess(){
+void standByMode(){
+
+    ISSAktive = true;
+    AcilStopON = true;
 
     gioSetBit(GIO_ALIGNMENT_VALF_LEFT_PORT, GIO_ALIGNMENT_VALF_LEFT_PIN,LOW);
     gioSetBit(GIO_ALIGNMENT_VALF_RIGHT_PORT, GIO_ALIGNMENT_VALF_RIGHT_PIN,LOW);
     gioSetBit(GIO_PUMP_PORT,GIO_PUMP_PIN,LOW);
-
-    AcilStopON = true;
-    ISSAktive = true;
+    gioSetBit(GIO_OIL_PUMP_PORT, GIO_OIL_PUMP_PIN,LOW);
 
     CanYellowHighLow(false);
     CanRedHighLow(false);
+    //DataDizi[2] = 0;
     //CANMessageSet(CAN0_BASE, 2, &Can_TX_Message, MSG_OBJ_TYPE_TX);
 }
 
@@ -811,44 +813,26 @@ void main(void)
 
         if(Semiautomaticmode){
 
-            if(systemActiveCheck()){
+            if(systemActiveCheck()&& !ISSCheck()){
 
                 gioSetBit(GIO_OIL_PUMP_PORT, GIO_OIL_PUMP_PIN, HIGH);
                 //DataDizi[2] = 255;
                 //CANMessageSet(CAN0_BASE, 2, &Can_TX_Message, MSG_OBJ_TYPE_TX);
-                if(ISSCheck()){
-                    ISSprocess();
-                }else{
-                    if( AutoHizalama ){
-                        AutoHizalamaProcess();
-                    }
-                    if(tick){
-                        tick = false;
-                        commandsCheck();
-                        controlLeds_Semi();
 
-                        if( ISSAktive ){
-                            AcilStopON = false;
-                            ISSAktive = false;
-                        }
-                    }
+                if( AutoHizalama ){
+                    AutoHizalamaProcess();
                 }
+
+                if(tick){
+                    tick = false;
+                    commandsCheck();
+                    controlLeds_Semi();
+                }
+
 
             }else{
-
-                ISSAktive = true;
-                AcilStopON = true;
-
-                gioSetBit(GIO_ALIGNMENT_VALF_LEFT_PORT, GIO_ALIGNMENT_VALF_LEFT_PIN,LOW);
-                gioSetBit(GIO_ALIGNMENT_VALF_RIGHT_PORT, GIO_ALIGNMENT_VALF_RIGHT_PIN,LOW);
-                gioSetBit(GIO_PUMP_PORT,GIO_PUMP_PIN,LOW);
-                CanYellowHighLow(false);
-                CanRedHighLow(false);
-
-                gioSetBit(GIO_OIL_PUMP_PORT, GIO_OIL_PUMP_PIN,LOW);
-//                    DataDizi[2] = 0;
-//                    CANMessageSet(CAN0_BASE, 2, &Can_TX_Message, MSG_OBJ_TYPE_TX);
-                }
+                standByMode();
+            }
 
         }//Semiautomaticmode
 
@@ -867,7 +851,8 @@ void rtiNotification(uint32 notification)
 //    if(notification ==rtiNOTIFICATION_COMPARE0){
         global_counter++;
         tick=true;
-
+        canMessageCheck();
+        getSensorAndCamelNeckValue();
 //        printf("%d \n",1);
 //    }
 
