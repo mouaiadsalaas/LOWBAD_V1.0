@@ -116,6 +116,7 @@ bool StopModeState = false;
 bool StopModeStateTwo = false;
 
 bool Caliberundefined = false;
+bool SystemActiveCaliber = true;
 
 
 typedef struct leds{
@@ -142,6 +143,21 @@ Led AutoHizalamaBitti;
 Led CaliberBozuk;
 Led OnSensorAriza;
 Led ArkaSensorAriza;
+
+
+typedef struct buttons{
+
+    bool state;
+    uint8_t count;
+    uint8_t set;
+
+}Button;
+
+
+Button KalibrasyonStart;
+Button KalibrasyonStop;
+Button KalibrasyonKesinKayit;
+Button OtomatikhizalamaEx;
 
 typedef enum delays{
 
@@ -170,8 +186,8 @@ void wait(uint32 time);
 //canbus
 #define  D_SIZE 9
 
-uint8  tx_data[D_SIZE]  = {'H','E','R','C','U','L','E','S','\0'};
-uint8  rx_data[D_SIZE] = {0};
+uint8  can_tx_data[D_SIZE];
+uint8  can_rx_data[D_SIZE] = {0};
 uint32 error = 0;
 
 uint8 sensorRight;
@@ -436,7 +452,6 @@ void InputInit(){
 
 void canMessageCheck(){
 
-    //canTransmit(canREG1, canMESSAGE_BOX4, tx_data);
 
     if(!canIsRxMessageArrived(canREG1, canMESSAGE_BOX1)){
         canGetData(canREG1, canMESSAGE_BOX1, &sensorRight);  /* receive on can2  */
@@ -447,7 +462,7 @@ void canMessageCheck(){
     if(!canIsRxMessageArrived(canREG1, canMESSAGE_BOX3)){
         canGetData(canREG1, canMESSAGE_BOX3, &PumpSlaveBtn);  /* receive on can2  */
     }
-        error = checkPackets(&tx_data[0],&rx_data[0],D_SIZE);
+        //error = checkPackets(&can_tx_data[0],&can_rx_data[0],D_SIZE);
 
         if( Semiautomaticmode ){
             if( !AcilStopON ){
@@ -507,8 +522,9 @@ void pumpCheck(){
 
         gioSetBit(GIO_PUMP_PORT, GIO_PUMP_PIN, HIGH);
         /* Can ikili dogrulama */
-        //DataDizi[4] = 1;
-        //CANMessageSet(CAN0_BASE, 2, &Can_TX_Message, MSG_OBJ_TYPE_TX);
+        //dikkat ali kodunda id 2 ama burada 4
+        can_tx_data[4] = 1;
+        canTransmit(canREG1, canMESSAGE_BOX4, can_tx_data);//id = 4
         /* Can ikili dogrulama */
         fullPumpState = true;
     }else{
@@ -516,8 +532,8 @@ void pumpCheck(){
 
             gioSetBit(GIO_PUMP_PORT, GIO_PUMP_PIN, LOW);
             /* Can ikili dogrulama */
-            //DataDizi[4] = 0;
-            //CANMessageSet(CAN0_BASE, 2, &Can_TX_Message, MSG_OBJ_TYPE_TX);
+            can_tx_data[4] = 0;
+            canTransmit(canREG1, canMESSAGE_BOX4, can_tx_data);//id = 4
             /* Can ikili dogrulama */
             fullPumpState = false;
         }
@@ -622,12 +638,15 @@ void controlLeds_Semi( void ){
                     CanRedHighLow(true);
                     AutoHizalamaBitti.counter++;
                 }
-                //CANMessageSet(CAN0_BASE, 2, &Can_TX_Message, MSG_OBJ_TYPE_TX);
+                //ali burada ne gonderecegini belirlemedi
+                //can_tx_data[4] = 0;
+                canTransmit(canREG1, canMESSAGE_BOX4, can_tx_data);//id = 4
             }else{
                 AutoHizalama = false;
                 AcilStopON = false;
-
-                //CANMessageSet(CAN0_BASE, 2, &Can_TX_Message, MSG_OBJ_TYPE_TX);
+                //ali burada ne gonderecegini belirlemedi
+                //can_tx_data[4] = 0;
+                canTransmit(canREG1, canMESSAGE_BOX4, can_tx_data);//id = 4
 
                 AutoHizalamaBitti.state =0;
                 AutoHizalamaBitti.set =0;
@@ -674,7 +693,7 @@ void controlLeds_Semi( void ){
                 CanYellowHighLow(true);
             }
 
-            //CANMessageSet(CAN0_BASE, 2, &Can_TX_Message, MSG_OBJ_TYPE_TX);
+            canTransmit(canREG1, canMESSAGE_BOX4, can_tx_data);//id = 4
         }
     }
 }
@@ -688,52 +707,83 @@ void modeWarning(){
     if(tick && Fullautomaticmode == false && Semiautomaticmode == false){
         tick = false;
 
-        if(Semiautomaticled.counter<2){
-            if(Semiautomaticled.set != 0){
-                if(++Semiautomaticled.count >= Semiautomaticled.set){
+        if( Semiautomaticled.set != 0){
+            if( ++Semiautomaticled.count >= Semiautomaticled.set){
 
-                    Semiautomaticled.state=!Semiautomaticled.state;
-                    Semiautomaticled.count = 0;
+                Semiautomaticled.count =0;
+                Semiautomaticled.state = !Semiautomaticled.state;
 
-                    if(Semiautomaticled.state){
-                        gioSetBit(GIO_ALIGNMENT_WARNING_LAMP_RED_PORT,GIO_ALIGNMENT_WARNING_LAMP_RED_PIN ,HIGH);
+                if( Semiautomaticled.counter < 2){
+
+                    if( Semiautomaticled.state){
+
+                        gioSetBit(GIO_ALIGNMENT_WARNING_LAMP_RED_PORT,GIO_ALIGNMENT_WARNING_LAMP_RED_PIN ,HIGH);//red
+
                     }else{
-                        gioSetBit(GIO_ALIGNMENT_WARNING_LAMP_RED_PORT,GIO_ALIGNMENT_WARNING_LAMP_RED_PIN ,LOW);
-                        Semiautomaticled.counter++;
-                        }
-                    }
-                }
-        }else{
-            Fullautomaticmode = false;
-            Semiautomaticmode = true;
+                        gioSetBit(GIO_ALIGNMENT_WARNING_LAMP_RED_PORT,GIO_ALIGNMENT_WARNING_LAMP_RED_PIN ,LOW);//red
 
-            Semiautomaticled.state =0;
-            Semiautomaticled.set =0;
+                        Semiautomaticled.counter++;
+                    }
+                    canTransmit(canREG1, canMESSAGE_BOX4, can_tx_data);//id = 4
+                }else{
+                    Fullautomaticmode = false;
+                    Semiautomaticmode = true;
+
+                    Semiautomaticled.state =0;
+                    Semiautomaticled.set =0;
+                }
+            }
         }//semiautonmaticwarning
 
 
-        if(Fullautomaticled.counter<2){
-            if(Fullautomaticled.set != 0){
-                if(++Fullautomaticled.count >= Fullautomaticled.set){
+        if( Fullautomaticled.set != 0){
+            if( ++Fullautomaticled.count >= Fullautomaticled.set){
 
-                    Fullautomaticled.state=!Fullautomaticled.state;
-                    Fullautomaticled.count = 0;
+                Fullautomaticled.count =0;
+                Fullautomaticled.state = !Fullautomaticled.state;
 
-                    if(Fullautomaticled.state){
-                        gioSetBit(GIO_ALIGNMENT_WARNING_LAMP_YELLOW_PORT,GIO_ALIGNMENT_WARNING_LAMP_YELLOW_PIN ,HIGH);//yellow
+                if( Fullautomaticled.counter < 2){
+
+                    if( Fullautomaticled.state){
+
+                        gioSetBit(GIO_ALIGNMENT_WARNING_LAMP_RED_PORT,GIO_ALIGNMENT_WARNING_LAMP_RED_PIN ,HIGH);//red
+
                     }else{
-                        gioSetBit(GIO_ALIGNMENT_WARNING_LAMP_YELLOW_PORT,GIO_ALIGNMENT_WARNING_LAMP_YELLOW_PIN ,LOW);//yellow
-                        Fullautomaticled.counter++;
-                        }
-                    }
-                }
-        }else{
-            Fullautomaticmode = true;
-            Semiautomaticmode = false;
+                        gioSetBit(GIO_ALIGNMENT_WARNING_LAMP_RED_PORT,GIO_ALIGNMENT_WARNING_LAMP_RED_PIN ,LOW);//red
 
-            Fullautomaticled.state =0;
-            Fullautomaticled.set =0;
-        }//Fullautonmaticwarning
+                        Fullautomaticled.counter++;
+                    }
+                    canTransmit(canREG1, canMESSAGE_BOX4, can_tx_data);//id = 4
+                }else{
+                    Fullautomaticmode = true;
+                    Semiautomaticmode = false;
+                    KalibrasyonStart.set = 55;
+
+                    KalibrasyonStop.set = 55;
+                    KalibrasyonKesinKayit.set = 50;
+
+                    CaliberStartLed.set = 0;
+                    CaliberStopLed.set = 0;
+                    CaliberBirinciKayitLed.set =0;
+                    CaliberikinciKayitLed.set =0;
+                    CaliberKesinKayitLed.set =0;
+                    CaliberAcilStopLed.set =0;
+
+
+                    TekerlekSagLed.set =0;
+                    TekerlekSolLed.set =0;
+                    TekerlekDuzLed.set =0;
+                    CaliberBozuk.set =0;
+                    SystemActiveCaliber = true;
+
+                    AutoHizalamaBitti.set =0;
+                    AutoHizalamaBitti.counter =0;
+
+                    Fullautomaticled.state =0;
+                    Fullautomaticled.set =0;
+                }
+            }
+        }//fullautonmaticwarning
 
 
     }//tick
@@ -785,8 +835,8 @@ void standByMode(){
 
     CanYellowHighLow(false);
     CanRedHighLow(false);
-    //DataDizi[2] = 0;
-    //CANMessageSet(CAN0_BASE, 2, &Can_TX_Message, MSG_OBJ_TYPE_TX);
+    can_tx_data[2] = 0;
+    canTransmit(canREG1, canMESSAGE_BOX4, can_tx_data);//id = 4
 }
 
 ///ADS not working check global counter maybe its timer is not working
@@ -812,12 +862,13 @@ void main(void)
         modeWarning();
 
         if(Semiautomaticmode){
-
+            can_tx_data[3] = 0;
+            canTransmit(canREG1, canMESSAGE_BOX4, can_tx_data);//id = 4
             if(systemActiveCheck()&& !ISSCheck()){
 
                 gioSetBit(GIO_OIL_PUMP_PORT, GIO_OIL_PUMP_PIN, HIGH);
-                //DataDizi[2] = 255;
-                //CANMessageSet(CAN0_BASE, 2, &Can_TX_Message, MSG_OBJ_TYPE_TX);
+                can_tx_data[2] = 255;
+                canTransmit(canREG1, canMESSAGE_BOX4, can_tx_data);//id = 4
 
                 if( AutoHizalama ){
                     AutoHizalamaProcess();
