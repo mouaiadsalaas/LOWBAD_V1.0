@@ -120,10 +120,10 @@ void rtiInit(void)
     rtiREG1->CMP[0U].UDCPx = 100000U;
 
     /** - Setup compare 1 value. This value is compared with selected free running counter. */
-    rtiREG1->CMP[1U].COMPx = 50000U;
+    rtiREG1->CMP[1U].COMPx = 500000U;
 
     /** - Setup update compare 1 value. This value is added to the compare 1 value on each compare match. */
-    rtiREG1->CMP[1U].UDCPx = 50000U;
+    rtiREG1->CMP[1U].UDCPx = 500000U;
 
     /** - Setup compare 2 value. This value is compared with selected free running counter. */
     rtiREG1->CMP[2U].COMPx = 80000U;
@@ -868,6 +868,33 @@ void rtiCompare0Interrupt(void)
     rtiNotification(rtiNOTIFICATION_COMPARE0);
 
 /* USER CODE BEGIN (75) */
+/* USER CODE END */
+}
+
+/* USER CODE BEGIN (76) */
+/* USER CODE END */
+
+/** @fn void rtiCompare1Interrupt(void)
+*   @brief RTI1 Compare 1 Interrupt Handler
+*
+*   RTI1 Compare 1 interrupt handler 
+*
+*/
+#pragma CODE_STATE(rtiCompare1Interrupt, 32)
+#pragma INTERRUPT(rtiCompare1Interrupt, IRQ)
+
+/* SourceId : RTI_SourceId_023 */
+/* DesignId : RTI_DesignId_022 */
+/* Requirements : HL_SR95 */
+void rtiCompare1Interrupt(void)
+{
+/* USER CODE BEGIN (77) */
+/* USER CODE END */
+
+    rtiREG1->INTFLAG = 2U;
+    rtiNotification(rtiNOTIFICATION_COMPARE1);
+
+/* USER CODE BEGIN (78) */
 /* USER CODE END */
 }
 

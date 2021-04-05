@@ -1,6 +1,6 @@
 /****************************************************************
  *  Header File: MCP23S17.h
- *  Description: MCP23S17 expander with HERCULES TMS570ls0432 library header source
+ *  Description: MCP23S17 expander with HERCULES TMS570ls0732 library header source
  *  Date       : 18.02.2021
  *  Author     : MOUAIAD SALAAS & ALI YOLCU
  *     ---------- ---------- ----------------------------
@@ -101,8 +101,24 @@ spiDAT1_t dataconfig1_t;
 #define    ADDR_reg       reg
 #define    ADDR_word      word
 
+#define    MCP_GPA0         1
+#define    MCP_GPA1         2
+#define    MCP_GPA2         3
+#define    MCP_GPA3         4
+#define    MCP_GPA4         5
+#define    MCP_GPA5         6
+#define    MCP_GPA6         7
+#define    MCP_GPA7         8
 
 
+#define    MCP_GPB0         9
+#define    MCP_GPB1         10
+#define    MCP_GPB2         11
+#define    MCP_GPB3         12
+#define    MCP_GPB4         13
+#define    MCP_GPB5         14
+#define    MCP_GPB6         15
+#define    MCP_GPB7         16
 /**************************************************************
  *Function Prototypes
  **************************************************************/
