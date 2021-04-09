@@ -31,13 +31,16 @@
 #define GIO_ISS_PIN                                  MCP_GPB2
 
 #define GIO_ALIGNMENT_RIGHT_BTN_PORT                 MCP_GPA
-#define GIO_ALIGNMENT_RIGHT_BTN_PIN                  MCP_GPA5
+#define GIO_ALIGNMENT_RIGHT_BTN_PIN                  MCP_GPB6
 
 #define GIO_ALIGNMENT_LEFT_BTN_PORT                      MCP_GPA
-#define GIO_ALIGNMENT_LEFT_BTN_PIN                       MCP_GPA6
+#define GIO_ALIGNMENT_LEFT_BTN_PIN                       MCP_GPB7
 
 #define GIO_ALIGNMENT_AUTO_BTN_PORT                  MCP_GPA
 #define GIO_ALIGNMENT_AUTO_BTN_PIN                   MCP_GPA7
+
+#define GIO_ALIGNMENT_SET_BTN_PORT                  MCP_GPB
+#define GIO_ALIGNMENT_SET_BTN_PIN                   MCP_GPB0
 
 #define GIO_STOP_BTN_PORT                           MCP_GPB
 #define GIO_STOP_BTN_PIN                            MCP_GPB1

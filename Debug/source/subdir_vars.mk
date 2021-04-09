@@ -16,6 +16,8 @@ ASM_SRCS += \
 ../source/sys_pmu.asm 
 
 C_SRCS += \
+../source/Device_TMS570LS07.c \
+../source/Fapi_UserDefinedFunctions.c \
 ../source/MCP23S17.c \
 ../source/PCA2129.c \
 ../source/SST25PF040C.c \
@@ -37,9 +39,25 @@ C_SRCS += \
 ../source/sys_selftest.c \
 ../source/sys_startup.c \
 ../source/sys_vim.c \
-../source/system.c 
+../source/system.c \
+../source/ti_fee_Info.c \
+../source/ti_fee_cancel.c \
+../source/ti_fee_cfg.c \
+../source/ti_fee_eraseimmediateblock.c \
+../source/ti_fee_format.c \
+../source/ti_fee_ini.c \
+../source/ti_fee_invalidateblock.c \
+../source/ti_fee_main.c \
+../source/ti_fee_read.c \
+../source/ti_fee_readSync.c \
+../source/ti_fee_shutdown.c \
+../source/ti_fee_util.c \
+../source/ti_fee_writeAsync.c \
+../source/ti_fee_writeSync.c 
 
 C_DEPS += \
+./source/Device_TMS570LS07.d \
+./source/Fapi_UserDefinedFunctions.d \
 ./source/MCP23S17.d \
 ./source/PCA2129.d \
 ./source/SST25PF040C.d \
@@ -61,9 +79,25 @@ C_DEPS += \
 ./source/sys_selftest.d \
 ./source/sys_startup.d \
 ./source/sys_vim.d \
-./source/system.d 
+./source/system.d \
+./source/ti_fee_Info.d \
+./source/ti_fee_cancel.d \
+./source/ti_fee_cfg.d \
+./source/ti_fee_eraseimmediateblock.d \
+./source/ti_fee_format.d \
+./source/ti_fee_ini.d \
+./source/ti_fee_invalidateblock.d \
+./source/ti_fee_main.d \
+./source/ti_fee_read.d \
+./source/ti_fee_readSync.d \
+./source/ti_fee_shutdown.d \
+./source/ti_fee_util.d \
+./source/ti_fee_writeAsync.d \
+./source/ti_fee_writeSync.d 
 
 OBJS += \
+./source/Device_TMS570LS07.obj \
+./source/Fapi_UserDefinedFunctions.obj \
 ./source/MCP23S17.obj \
 ./source/PCA2129.obj \
 ./source/SST25PF040C.obj \
@@ -90,7 +124,21 @@ OBJS += \
 ./source/sys_selftest.obj \
 ./source/sys_startup.obj \
 ./source/sys_vim.obj \
-./source/system.obj 
+./source/system.obj \
+./source/ti_fee_Info.obj \
+./source/ti_fee_cancel.obj \
+./source/ti_fee_cfg.obj \
+./source/ti_fee_eraseimmediateblock.obj \
+./source/ti_fee_format.obj \
+./source/ti_fee_ini.obj \
+./source/ti_fee_invalidateblock.obj \
+./source/ti_fee_main.obj \
+./source/ti_fee_read.obj \
+./source/ti_fee_readSync.obj \
+./source/ti_fee_shutdown.obj \
+./source/ti_fee_util.obj \
+./source/ti_fee_writeAsync.obj \
+./source/ti_fee_writeSync.obj 
 
 ASM_DEPS += \
 ./source/dabort.d \
@@ -100,6 +148,8 @@ ASM_DEPS += \
 ./source/sys_pmu.d 
 
 OBJS__QUOTED += \
+"source\Device_TMS570LS07.obj" \
+"source\Fapi_UserDefinedFunctions.obj" \
 "source\MCP23S17.obj" \
 "source\PCA2129.obj" \
 "source\SST25PF040C.obj" \
@@ -126,9 +176,25 @@ OBJS__QUOTED += \
 "source\sys_selftest.obj" \
 "source\sys_startup.obj" \
 "source\sys_vim.obj" \
-"source\system.obj" 
+"source\system.obj" \
+"source\ti_fee_Info.obj" \
+"source\ti_fee_cancel.obj" \
+"source\ti_fee_cfg.obj" \
+"source\ti_fee_eraseimmediateblock.obj" \
+"source\ti_fee_format.obj" \
+"source\ti_fee_ini.obj" \
+"source\ti_fee_invalidateblock.obj" \
+"source\ti_fee_main.obj" \
+"source\ti_fee_read.obj" \
+"source\ti_fee_readSync.obj" \
+"source\ti_fee_shutdown.obj" \
+"source\ti_fee_util.obj" \
+"source\ti_fee_writeAsync.obj" \
+"source\ti_fee_writeSync.obj" 
 
 C_DEPS__QUOTED += \
+"source\Device_TMS570LS07.d" \
+"source\Fapi_UserDefinedFunctions.d" \
 "source\MCP23S17.d" \
 "source\PCA2129.d" \
 "source\SST25PF040C.d" \
@@ -150,7 +216,21 @@ C_DEPS__QUOTED += \
 "source\sys_selftest.d" \
 "source\sys_startup.d" \
 "source\sys_vim.d" \
-"source\system.d" 
+"source\system.d" \
+"source\ti_fee_Info.d" \
+"source\ti_fee_cancel.d" \
+"source\ti_fee_cfg.d" \
+"source\ti_fee_eraseimmediateblock.d" \
+"source\ti_fee_format.d" \
+"source\ti_fee_ini.d" \
+"source\ti_fee_invalidateblock.d" \
+"source\ti_fee_main.d" \
+"source\ti_fee_read.d" \
+"source\ti_fee_readSync.d" \
+"source\ti_fee_shutdown.d" \
+"source\ti_fee_util.d" \
+"source\ti_fee_writeAsync.d" \
+"source\ti_fee_writeSync.d" 
 
 ASM_DEPS__QUOTED += \
 "source\dabort.d" \
@@ -160,6 +240,8 @@ ASM_DEPS__QUOTED += \
 "source\sys_pmu.d" 
 
 C_SRCS__QUOTED += \
+"../source/Device_TMS570LS07.c" \
+"../source/Fapi_UserDefinedFunctions.c" \
 "../source/MCP23S17.c" \
 "../source/PCA2129.c" \
 "../source/SST25PF040C.c" \
@@ -181,7 +263,21 @@ C_SRCS__QUOTED += \
 "../source/sys_selftest.c" \
 "../source/sys_startup.c" \
 "../source/sys_vim.c" \
-"../source/system.c" 
+"../source/system.c" \
+"../source/ti_fee_Info.c" \
+"../source/ti_fee_cancel.c" \
+"../source/ti_fee_cfg.c" \
+"../source/ti_fee_eraseimmediateblock.c" \
+"../source/ti_fee_format.c" \
+"../source/ti_fee_ini.c" \
+"../source/ti_fee_invalidateblock.c" \
+"../source/ti_fee_main.c" \
+"../source/ti_fee_read.c" \
+"../source/ti_fee_readSync.c" \
+"../source/ti_fee_shutdown.c" \
+"../source/ti_fee_util.c" \
+"../source/ti_fee_writeAsync.c" \
+"../source/ti_fee_writeSync.c" 
 
 ASM_SRCS__QUOTED += \
 "../source/dabort.asm" \

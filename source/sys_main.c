@@ -1,7 +1,6 @@
 #include "sys_common.h"
 #include "system.h"
 
-
 #include <stdio.h>
 #include <stdint.h>
 #include <signal.h>
@@ -19,6 +18,7 @@
 #include "adc.h"
 #include "spi.h"
 #include "can.h"
+#include "ti_fee.h"
 
 #include "PINOUT.h"
 #include "LOWBAD_IO_PIN.h"
@@ -46,7 +46,7 @@
  *
  *
  */
-uint16 myinput[8];
+uint16 myinput[16];
 uint8_t result;
 
 //ADS1018
@@ -107,9 +107,15 @@ bool AlignmentRightState = false;
 bool AlignmentLeftState = false;
 bool AlignmentAutoState = false;
 
+uint8_t aligment_buf;
 bool SetMode = false;
 bool StopMode = false;
+bool emergency_stop = false;
 bool ISS = false;
+bool auto_aligment =false;
+bool left_aligment =false;
+bool right_aligment =false;
+bool set_aligment =false;
 
 bool SetModeState = false;
 bool StopModeState = false;
@@ -118,6 +124,18 @@ bool StopModeStateTwo = false;
 bool Caliberundefined = false;
 bool SystemActiveCaliber = true;
 
+int CamelneckHomeTemporary;
+int CamelneckRightAngleTemporary;
+int CamelneckLeftAngleTemporary;
+float CamelneckNumberTemporary;
+
+int FifthWheelHomeTemporary;
+int FifthWheelRightAngleTemporary;
+int FifthWheelLeftAngleTemporary;
+float FifthWheelNumberTemporary;
+
+int FifthWheelNumberValue =0;
+int CamelneckNumberValue =0;
 
 typedef struct leds{
 
@@ -167,12 +185,29 @@ typedef enum delays{
 
 }Delays;
 
+bool full_Automatic_AutoAlignment = false;
+bool full_Automatic_Set_Aligment = false;
+
 bool tick=false;
 bool tick2=false;
 bool Fullautomaticmode = false;
 bool Semiautomaticmode = false;
 uint16_t AttractiveRightSensor; // Sensor 1
 uint16_t AttractiveLeftSensorAndCamelNeck; // Sensor 2
+
+
+/**************************************************************************/
+int AciSonuc =0;
+bool BigAngle = true;
+bool SmallAngle = true;
+
+uint16_t LevelState = 0;
+uint16_t sensorData;
+uint8_t aligment_set_level = 0;
+bool PumpState = false;
+
+bool CaliberMod = true;
+bool AutoControl = true; //true ali
 //ADS1018 spi config
 
 //adc
@@ -184,7 +219,7 @@ void wait(uint32 time);
     uint64 value =0;
 
 //canbus
-#define  D_SIZE 9
+#define  D_SIZE 8
 
 uint8  can_tx_data[D_SIZE];
 uint8  can_rx_data[D_SIZE] = {0};
@@ -199,6 +234,33 @@ uint16 *Dateinfo;
 
 //SST25PF040C
 uint16_t adress_value = 0;
+
+//eeprom
+uint16 u16JobResult,Status;
+Std_ReturnType oResult=E_OK;
+unsigned char read_data[100]={0};
+
+uint8 SpecialRamBlock[100]={1,2,3,4,5,7,7,4,4};
+
+unsigned char pattern;
+uint16 u16writecounter;
+
+unsigned int  FeeVirtualSectorNumber;
+unsigned char VsState, u8EEPIndex;
+unsigned char u8VirtualSector;
+uint8 Test_Recovery;
+uint8 Test_Cancel;
+
+void delay(void)
+{
+    unsigned int dummycnt=0x0000FFU;
+    do
+    {
+        dummycnt--;
+    }
+    while(dummycnt>0);
+}
+
 
 uint32 checkPackets(uint8 *src_packet,uint8 *dst_packet,uint32 psize);
 
@@ -414,8 +476,12 @@ void CanYellowHighLow ( bool state ){
 
     if( state ){
         gioSetBit(GIO_ALIGNMENT_WARNING_LAMP_RED_PORT,GIO_ALIGNMENT_WARNING_LAMP_RED_PIN ,HIGH);//yellow
+        can_tx_data[0] = (255) & 0xFF;
+
     }else{
         gioSetBit(GIO_ALIGNMENT_WARNING_LAMP_RED_PORT,GIO_ALIGNMENT_WARNING_LAMP_RED_PIN ,LOW);//yellow
+        can_tx_data[0] = (0) & 0xFF;
+
     }
 }
 
@@ -423,22 +489,23 @@ void CanRedHighLow ( bool state ){
 
     if( state ){
         gioSetBit(GIO_ALIGNMENT_WARNING_LAMP_RED_PORT,GIO_ALIGNMENT_WARNING_LAMP_RED_PIN ,HIGH);
-        //DataDizi[1] = (255) & 0xFF;
+        can_tx_data[1] = (255) & 0xFF;
     }else{
         gioSetBit(GIO_ALIGNMENT_WARNING_LAMP_RED_PORT,GIO_ALIGNMENT_WARNING_LAMP_RED_PIN ,LOW);
-       // DataDizi[1] = (0) & 0xFF;
+        can_tx_data[1] = (0) & 0xFF;
     }
 }
 
 void MCUADCread(){
     adcStartConversion(adcREG1,adcGROUP1);
 
-    while((adcIsConversionComplete(adcREG1,adcGROUP1))==0);
-    ch_count = adcGetData(adcREG1, adcGROUP1,&adc_data[0]);
-    ch_count = ch_count;
-    AllPowerSwitchSTatusGet();
+    if((adcIsConversionComplete(adcREG1,adcGROUP1))!=0){
+        ch_count = adcGetData(adcREG1, adcGROUP1,&adc_data[0]);
+        ch_count = ch_count;
+        AllPowerSwitchSTatusGet();
+        adcStopConversion(adcREG1,adcGROUP1);
+    }
 
-    adcStopConversion(adcREG1,adcGROUP1);
 }
 
 
@@ -447,61 +514,173 @@ void InputInit(){
     for(int i=1 ; i<=16 ; i++){
         MCP_PinMode(i, 0);      //set second pin to be input
     }
-
 }
 
 void canMessageCheck(){
 
-
     if(!canIsRxMessageArrived(canREG1, canMESSAGE_BOX1)){
-        canGetData(canREG1, canMESSAGE_BOX1, &sensorRight);  /* receive on can2  */
+        canGetData(canREG1, canMESSAGE_BOX1,can_rx_data);  /* receive on can2  */ //id 1
     }
-    if(!canIsRxMessageArrived(canREG1, canMESSAGE_BOX2)){
-        canGetData(canREG1, canMESSAGE_BOX2, &sensorLeft);  /* receive on can2  */
-    }
-    if(!canIsRxMessageArrived(canREG1, canMESSAGE_BOX3)){
-        canGetData(canREG1, canMESSAGE_BOX3, &PumpSlaveBtn);  /* receive on can2  */
-    }
-        //error = checkPackets(&can_tx_data[0],&can_rx_data[0],D_SIZE);
 
-        if( Semiautomaticmode ){
-            if( !AcilStopON ){
-                       if( sensorRight == true && sensorLeft == true ){
+    if( Semiautomaticmode ){
 
-                           CanRedHighLow(true);
-                       }else{
-                           CanRedHighLow(false);
-                       }
+        sensorRight = can_rx_data[0];
+        sensorLeft =  can_rx_data[1];
+        PumpSlaveBtn =can_rx_data[2];
 
+        if( !AcilStopON ){
 
-                       //aliye sor 2500 ve 150 ne demek
-                       if( AttractiveLeftSensorAndCamelNeck >= 2500 ){
-
-                           CanYellowHighLow(true);
-                           AutoHizalamaState = true;
-                       }else if(AttractiveLeftSensorAndCamelNeck <= 150 ){
-
-                           CanYellowHighLow(false);
-                           AutoHizalamaState = false;
-                           AutoHizalama = false;
-
-                       }
+            if( sensorRight == true && sensorLeft == true ){
+                CanRedHighLow(true);
+            }else{
+                CanRedHighLow(false);
             }
+
+            if( AttractiveLeftSensorAndCamelNeck >= 2500 ){
+                CanYellowHighLow(true);
+                AutoHizalamaState = true;
+
+            }else if(AttractiveLeftSensorAndCamelNeck <= 150 ){
+                CanYellowHighLow(false);
+                AutoHizalamaState = false;
+                AutoHizalama = false;
+            }
+
         }
+    }
+
+//
+//    if( Fullautomaticmode ){
+//
+//        //ValueToAngle(e2prom_read_value.CamelneckHome, e2prom_read_value.CamelneckNumber, AttractiveLeftSensorAndCamelNeck);
+//        //HedefAci(DegerSonuc);
+//        //AngleToValue(e2prom_read_value.FifthWheelHome, e2prom_read_value.FifthWheelNumber, AngleValue);
+//
+//        sensorData = can_rx_data[0];
+//        sensorData <<= 8;
+//        sensorData |= can_rx_data[1];
+//
+//        PumpSlaveBtn =  can_rx_data[2];
+//
+//        if( Caliberundefined == true){
+//
+//            if( sensorData >= (AciSonuc - 5)  && sensorData <= (AciSonuc + 5) ){
+//
+//                AutoHizalamaState = false;
+//
+//                TekerlekDuzLed.set = DELAY_250MS;
+//                TekerlekSagLed.set =0;
+//                TekerlekSolLed.set =0;
+//                CaliberBozuk.set = 0;
+//                OnSensorAriza.set =0;
+//                ArkaSensorAriza.set =0;
+//
+// //           }else if( sensorData <  AciSonuc  && sensorData > e2prom_read_value.FifthWheelLeftAngle){
+//
+//                AutoHizalamaState = true;
+//
+//                TekerlekDuzLed.set =0;
+//                TekerlekSagLed.set =0;
+//                TekerlekSolLed.set =DELAY_500MS;
+//                CaliberBozuk.set = 0;
+//                OnSensorAriza.set =0;
+//                ArkaSensorAriza.set =0;
+//
+// //           }else if( sensorData > AciSonuc  && sensorData < e2prom_read_value.FifthWheelRightAngle ){
+//                AutoHizalamaState = true;
+//
+//                TekerlekDuzLed.set =0;
+//                TekerlekSagLed.set =DELAY_500MS;
+//                TekerlekSolLed.set =0;
+//                CaliberBozuk.set = 0;
+//                OnSensorAriza.set =0;
+//                ArkaSensorAriza.set =0;
+//
+////            }else if( sensorData  < (e2prom_read_value.FifthWheelLeftAngle - 300)){
+////                if(sensorData  < (e2prom_read_value.FifthWheelLeftAngle - 350)){
+//                    CaliberBozuk.set = DELAY_250MS;
+//
+//                    TekerlekDuzLed.set =0;
+//                    TekerlekSagLed.set =0;
+//                    TekerlekSolLed.set =0;
+//                    OnSensorAriza.set =0;
+//                    ArkaSensorAriza.set = 0;
+//                //}else{
+//                    CaliberBozuk.set = 0;
+//                    TekerlekDuzLed.set =0;
+//                    TekerlekSagLed.set =0;
+//                    TekerlekSolLed.set =0;
+//                    OnSensorAriza.set =0;
+//                    ArkaSensorAriza.set = DELAY_250MS;
+//                //}
+////            }else if( sensorData > (e2prom_read_value.FifthWheelRightAngle + 300)){
+////                if(sensorData  > (e2prom_read_value.FifthWheelRightAngle + 350)){
+//                    CaliberBozuk.set = DELAY_250MS;
+//
+//                    TekerlekDuzLed.set =0;
+//                    TekerlekSagLed.set =0;
+//                    TekerlekSolLed.set =0;
+//                    OnSensorAriza.set =0;
+//                    ArkaSensorAriza.set = 0;
+//                //}else{
+//                    CaliberBozuk.set = 0;
+//                    TekerlekDuzLed.set =0;
+//                    TekerlekSagLed.set =0;
+//                    TekerlekSolLed.set =0;
+//                    OnSensorAriza.set =0;
+//                    ArkaSensorAriza.set = DELAY_250MS;
+//                //}
+////            }else if( AttractiveLeftSensorAndCamelNeck < (e2prom_read_value.CamelneckLeftAngle - 300)){
+////                if( AttractiveLeftSensorAndCamelNeck < (e2prom_read_value.CamelneckLeftAngle - 350) && AttractiveLeftSensorAndCamelNeck > e2prom_read_value.CamelneckLeftAngle){
+//                    CaliberBozuk.set = DELAY_250MS;
+//
+//                    TekerlekDuzLed.set =0;
+//                    TekerlekSagLed.set =0;
+//                    TekerlekSolLed.set =0;
+//                    ArkaSensorAriza.set =0;
+//                    OnSensorAriza.set = 0;
+//               // }else{
+//                    CaliberBozuk.set = 0;
+//                    TekerlekDuzLed.set =0;
+//                    TekerlekSagLed.set =0;
+//                    TekerlekSolLed.set =0;
+//                    ArkaSensorAriza.set =0;
+//                    OnSensorAriza.set = DELAY_250MS;
+//               // }
+////            }else if( AttractiveLeftSensorAndCamelNeck > (e2prom_read_value.CamelneckRightAngle + 300)){
+////                if( AttractiveLeftSensorAndCamelNeck > (e2prom_read_value.CamelneckRightAngle + 350) && AttractiveLeftSensorAndCamelNeck < e2prom_read_value.CamelneckRightAngle){
+//                    CaliberBozuk.set = DELAY_250MS;
+//
+//                    TekerlekDuzLed.set =0;
+//                    TekerlekSagLed.set =0;
+//                    TekerlekSolLed.set =0;
+//                    ArkaSensorAriza.set =0;
+//                    OnSensorAriza.set = 0;
+//               // }else{
+//                    CaliberBozuk.set = 0;
+//                    TekerlekDuzLed.set =0;
+//                    TekerlekSagLed.set =0;
+//                    TekerlekSolLed.set =0;
+//                    ArkaSensorAriza.set =0;
+//                    OnSensorAriza.set = DELAY_250MS;
+//               // }
+//            }
+//        }
+//    }
 
 }
 
 bool systemActiveCheck(){
-    if(MCP_pinRead(GPO_SYSTEM_ACTIVE_PIN)){
-        SysActive = true;
-    }
+
+        SysActive =  MCP_pinRead(GPO_SYSTEM_ACTIVE_PIN);
+
     return SysActive;
 }
 
 bool ISSCheck(){
-    if( MCP_pinRead(GIO_ISS_PIN) ){
-        ISSActiveState = true;
-    }
+
+        ISSActiveState = MCP_pinRead(MCP_GPB2);
+
     return ISSActiveState;
 }
 
@@ -517,7 +696,7 @@ void getSensorAndCamelNeckValue(){
 
 
 
-void pumpCheck(){
+void semiAutomaticPumpCheck(){
     if ( PumpSlaveBtn ){ //Button Push UP
 
         gioSetBit(GIO_PUMP_PORT, GIO_PUMP_PIN, HIGH);
@@ -538,14 +717,37 @@ void pumpCheck(){
             fullPumpState = false;
         }
     }
+
+
+
 }
 
-void AligmentCommandsCheck(){
+void fullAutomaticPumpCheck(){
+    if ( PumpSlaveBtn ){ //Button Push UP
+
+         gioSetBit(GIO_PUMP_PORT, GIO_PUMP_PIN , HIGH);
+
+//         DataDizi[4] = 1;
+//         CANMessageSet(CAN0_BASE, 2, &Can_TX_Message, MSG_OBJ_TYPE_TX);
+
+         PumpState = true;
+     }else{
+         if( PumpState == true){
+
+             gioSetBit(GIO_PUMP_PORT, GIO_PUMP_PIN , LOW);
+
+//             DataDizi[4] = 0;
+//             CANMessageSet(CAN0_BASE, 2, &Can_TX_Message, MSG_OBJ_TYPE_TX);
+
+             PumpState = false;
+         }
+     }
+}
+void semiAutomaticAligmentCommandsCheck(){
     if( !AutoHizalama ){
 
-          if ( AlignmentRight != MCP_pinRead(GIO_ALIGNMENT_RIGHT_BTN_PIN)){
-
-              if ((AlignmentRight = MCP_pinRead(GIO_ALIGNMENT_RIGHT_BTN_PIN)) ){ //Button Push UP
+          if ( AlignmentRight != MCP_pinRead(GIO_ALIGNMENT_RIGHT_BTN_PIN) ){
+              if (AlignmentRight = MCP_pinRead(GIO_ALIGNMENT_RIGHT_BTN_PIN)){ //Button Push UP
 
                   gioSetBit(GIO_ALIGNMENT_VALF_RIGHT_PORT, GIO_ALIGNMENT_VALF_RIGHT_PIN, HIGH);
                   gioSetBit(GIO_PUMP_PORT, GIO_PUMP_PIN, HIGH);
@@ -558,69 +760,244 @@ void AligmentCommandsCheck(){
                       AlignmentRightState = false;
                   }
               }
-          }
+          }//AlignmentRightBTN
 
-          if ( AlignmentLeft != MCP_pinRead(GIO_ALIGNMENT_LEFT_BTN_PIN)){
-
-              if ((AlignmentLeft = MCP_pinRead(GIO_ALIGNMENT_LEFT_BTN_PIN)) ){ //Button Push UP
+          if ( AlignmentLeft != MCP_pinRead(GIO_ALIGNMENT_LEFT_BTN_PIN) ){
+              if (AlignmentLeft = MCP_pinRead(GIO_ALIGNMENT_LEFT_BTN_PIN)){ //Button Push UP
 
                   gioSetBit(GIO_ALIGNMENT_VALF_LEFT_PORT, GIO_ALIGNMENT_VALF_LEFT_PIN, HIGH);
                   gioSetBit(GIO_PUMP_PORT, GIO_PUMP_PIN, HIGH);
                   AlignmentLeftState = true;
               }else{
-                  if( AlignmentRightState == true){
+                  if( AlignmentRightState == true){//
 
                       gioSetBit(GIO_ALIGNMENT_VALF_LEFT_PORT, GIO_ALIGNMENT_VALF_LEFT_PIN, LOW);
                       gioSetBit(GIO_PUMP_PORT, GIO_PUMP_PIN, LOW);
                       AlignmentLeftState = false;
                   }
               }
-          }
-      }
+          }//AlignmentLeftBTN
+      }// !AutoHizalama
+
       if( AutoHizalamaState ){
 
           if ( AlignmentAuto != MCP_pinRead(GIO_ALIGNMENT_AUTO_BTN_PIN)){
-
             if (AlignmentAuto = MCP_pinRead(GIO_ALIGNMENT_AUTO_BTN_PIN)){
 
                 AutoHizalama = true;
                 AlignmentAutoState = true;
             }else{
                 if( AlignmentAutoState == true){
-
                     AlignmentAutoState = false;
                 }
             }
           }
-      }
+      }//AutoHizalama
 
       //Acil Stop Butonu
       if ( StopMode != MCP_pinRead(GIO_STOP_BTN_PIN) ){
-
         if (StopMode = MCP_pinRead(GIO_STOP_BTN_PIN)){
-
 
             CaliberAcilStopLed.set = DELAY_250MS;
             AcilStopON = true;
-
             StopModeState = true;
         }else{
             if( StopModeState == true){
 
                 CaliberAcilStopLed.set = 0;
                 Caliberundefined = true;
-
                 AcilStopON = false;
-
                 StopModeState = false;
             }
         }
-      }
+      }//StopMode
 
 }
 
+void setAligmentProcess(){
+if(aligment_set_level == 1){
+    printf("level 1 saving\n");
+//        if( AttractiveLeftSensorAndCamelNeck > CamelneckHomeTemporary){
+//
+//              CamelneckRightAngleTemporary = AttractiveLeftSensorAndCamelNeck;
+//              CamelneckNumberValue = -1 *(CamelneckHomeTemporary - CamelneckRightAngleTemporary);
+//              CamelneckLeftAngleTemporary = CamelneckHomeTemporary - CamelneckNumberValue;
+//              CamelneckNumberTemporary = CamelneckNumberValue / 90;
+//
+//              FifthWheelRightAngleTemporary = sensorData;
+//              FifthWheelNumberValue = -1 * (FifthWheelHomeTemporary - FifthWheelRightAngleTemporary);
+//              FifthWheelLeftAngleTemporary = FifthWheelHomeTemporary - FifthWheelNumberValue;
+//              FifthWheelNumberTemporary = FifthWheelNumberValue / 38;
+//          }else{
+//              CamelneckLeftAngleTemporary = AttractiveLeftSensorAndCamelNeck;
+//              CamelneckNumberValue = CamelneckHomeTemporary - CamelneckLeftAngleTemporary;
+//              CamelneckRightAngleTemporary = CamelneckHomeTemporary + CamelneckNumberValue;
+//              CamelneckNumberTemporary = CamelneckNumberValue / 90;
+//
+//              FifthWheelLeftAngleTemporary = sensorData;
+//              FifthWheelNumberValue = FifthWheelHomeTemporary - FifthWheelLeftAngleTemporary;
+//              FifthWheelRightAngleTemporary = FifthWheelHomeTemporary + FifthWheelNumberValue;
+//              FifthWheelNumberTemporary = FifthWheelNumberValue / 38;
+//          }
 
-void controlLeds_Semi( void ){
+        aligment_set_level = 2;
+
+    }
+}
+
+void commandButtonscheck(){
+
+    //here we need to try enum and create one function
+    if ( AlignmentRight != MCP_pinRead(GIO_ALIGNMENT_RIGHT_BTN_PIN)){
+        if (AlignmentRight = MCP_pinRead(GIO_ALIGNMENT_RIGHT_BTN_PIN)){ //Button Push UP
+
+            aligment_buf = set_bit(aligment_buf, 0, 1);
+            right_aligment = true;
+        }else{
+            aligment_buf = set_bit(aligment_buf, 0, 0);
+            right_aligment = false;
+        }
+    }
+
+    if ( AlignmentLeft != MCP_pinRead(GIO_ALIGNMENT_LEFT_BTN_PIN) ){
+        if ((AlignmentLeft = MCP_pinRead(GIO_ALIGNMENT_LEFT_BTN_PIN)) ){
+
+            aligment_buf = set_bit(aligment_buf, 1, 1);
+            left_aligment = true;
+        }else{
+            aligment_buf = set_bit(aligment_buf, 1, 0);
+            left_aligment = false;
+        }
+    }
+
+
+    if ( AlignmentAuto != MCP_pinRead(GIO_ALIGNMENT_AUTO_BTN_PIN) ){
+        if ((AlignmentAuto = MCP_pinRead(GIO_ALIGNMENT_AUTO_BTN_PIN)) ){
+
+            aligment_buf = set_bit(aligment_buf, 2, 1);
+            auto_aligment = true;
+        }else{
+            aligment_buf = set_bit(aligment_buf, 2, 0);
+            auto_aligment =false;
+        }
+    }
+
+    if ( SetMode != MCP_pinRead(GIO_ALIGNMENT_SET_BTN_PIN) ){
+        if ((SetMode = MCP_pinRead(GIO_ALIGNMENT_SET_BTN_PIN)) ){
+
+            aligment_buf = set_bit(aligment_buf, 3, 1);
+            set_aligment = true;
+        }else{
+            aligment_buf = set_bit(aligment_buf, 3, 0);
+            set_aligment = false;
+        }
+    }
+
+    if ( StopMode != MCP_pinRead(GIO_STOP_BTN_PIN) ){
+        if ((StopMode = MCP_pinRead(GIO_STOP_BTN_PIN)) ){
+
+            aligment_buf = set_bit(aligment_buf, 4, 1);
+            emergency_stop = true;
+        }else{
+            aligment_buf = set_bit(aligment_buf, 4, 0);
+            emergency_stop = false;
+
+        }
+    }
+
+}
+
+void fullAutomaticAligmentCommandsCheck(){
+    commandButtonscheck();
+
+
+    switch (aligment_buf) {
+        case 0:
+            gioSetBit(GIO_ALIGNMENT_VALF_RIGHT_PORT, GIO_ALIGNMENT_VALF_RIGHT_PIN, LOW);
+            gioSetBit(GIO_ALIGNMENT_VALF_LEFT_PORT, GIO_ALIGNMENT_VALF_LEFT_PIN, LOW);
+            gioSetBit(GIO_PUMP_PORT, GIO_PUMP_PIN, LOW);
+            break;
+
+        case 1:
+            if(emergency_stop == false && right_aligment == true){
+                gioSetBit(GIO_ALIGNMENT_VALF_RIGHT_PORT, GIO_ALIGNMENT_VALF_RIGHT_PIN, HIGH);
+                gioSetBit(GIO_PUMP_PORT, GIO_PUMP_PIN, HIGH);
+                if(full_Automatic_Set_Aligment){
+                    printf("right save\n");
+                    setAligmentProcess();
+                }else{}
+            }else{
+                gioSetBit(GIO_ALIGNMENT_VALF_RIGHT_PORT, GIO_ALIGNMENT_VALF_RIGHT_PIN, LOW);
+                gioSetBit(GIO_PUMP_PORT, GIO_PUMP_PIN, LOW);
+            }
+            break;
+
+        case 2:
+            if(emergency_stop == false && left_aligment == true){
+                gioSetBit(GIO_ALIGNMENT_VALF_LEFT_PORT, GIO_ALIGNMENT_VALF_LEFT_PIN, HIGH);
+                gioSetBit(GIO_PUMP_PORT, GIO_PUMP_PIN, HIGH);
+                if(full_Automatic_Set_Aligment){
+                    printf("left save\n");
+                    setAligmentProcess();
+                }else{}
+            }else{
+                gioSetBit(GIO_ALIGNMENT_VALF_LEFT_PORT, GIO_ALIGNMENT_VALF_LEFT_PIN, LOW);
+                gioSetBit(GIO_PUMP_PORT, GIO_PUMP_PIN, LOW);
+            }
+            break;
+
+        case 4:
+            if(emergency_stop == false && auto_aligment == true){
+                if(full_Automatic_Set_Aligment){
+                    if(aligment_set_level == 0){
+                        printf("home save\n");
+                        //take neckangle as  neck angle Home
+                        //take sensordata as FifthWheel Home
+                        CamelneckHomeTemporary = AttractiveLeftSensorAndCamelNeck;
+                        FifthWheelHomeTemporary = sensorData;
+                        aligment_set_level = 1;
+                    }
+                }else{
+                    full_Automatic_AutoAlignment=true;
+                }
+            }
+            break;
+
+        case 8:
+            if(emergency_stop == false){
+                full_Automatic_Set_Aligment = true;
+            }
+            break;
+
+        case 12:
+            if(emergency_stop == false){
+                if(aligment_set_level == 2){
+                    full_Automatic_Set_Aligment = false;
+                    printf("saved\n");
+                    printf("saved\n");
+                    aligment_set_level = 0;
+
+                    //save settings
+                }
+
+            }else{
+
+            }
+            break;
+
+        case 16:
+            emergency_stop = true;
+
+            break;
+        default:
+            gioSetBit(GIO_ALIGNMENT_VALF_RIGHT_PORT, GIO_ALIGNMENT_VALF_RIGHT_PIN, LOW);
+            gioSetBit(GIO_ALIGNMENT_VALF_LEFT_PORT, GIO_ALIGNMENT_VALF_LEFT_PIN, LOW);
+            gioSetBit(GIO_PUMP_PORT, GIO_PUMP_PIN, LOW);
+            break;
+
+    }
+}
+void semiAutomaticControlLeds( void ){
 
     if( AutoHizalamaBitti.set !=0 ){
         if( ++AutoHizalamaBitti.count >= AutoHizalamaBitti.set ){
@@ -638,21 +1015,18 @@ void controlLeds_Semi( void ){
                     CanRedHighLow(true);
                     AutoHizalamaBitti.counter++;
                 }
-                //ali burada ne gonderecegini belirlemedi
-                //can_tx_data[4] = 0;
+
                 canTransmit(canREG1, canMESSAGE_BOX4, can_tx_data);//id = 4
             }else{
                 AutoHizalama = false;
                 AcilStopON = false;
-                //ali burada ne gonderecegini belirlemedi
-                //can_tx_data[4] = 0;
                 canTransmit(canREG1, canMESSAGE_BOX4, can_tx_data);//id = 4
 
                 AutoHizalamaBitti.state =0;
                 AutoHizalamaBitti.set =0;
             }
         }
-    }
+    }//AutoHizalamaBitti.set
 
     if( CaliberAcilStopLed.set != 0){
         if( ++CaliberAcilStopLed.count >= CaliberAcilStopLed.set){
@@ -684,25 +1058,32 @@ void controlLeds_Semi( void ){
             CanRedHighLow(false);
 
             if( CaliberAcilStopLed.state){
-
                 CanRedHighLow(true);
                 CanYellowHighLow(false);
             }else{
-
                 CanRedHighLow(false);
                 CanYellowHighLow(true);
             }
 
             canTransmit(canREG1, canMESSAGE_BOX4, can_tx_data);//id = 4
+        }//CaliberAcilStopLed.count
+    }//CaliberAcilStopLed.set
+}
+
+void fullAutomaticControlLeds(){
+
+}
+
+void semiAutomaticCommandsCheck(){
+    semiAutomaticPumpCheck();
+    semiAutomaticAligmentCommandsCheck();
+}
+
+void fullAutomaticCommandCheck(){
+    if( full_Automatic_AutoAlignment == false ){ // Otomatik Hizalama
+        fullAutomaticAligmentCommandsCheck();
         }
-    }
 }
-
-void commandsCheck(){
-    pumpCheck();
-    AligmentCommandsCheck();
-}
-
 void modeWarning(){
     if(tick && Fullautomaticmode == false && Semiautomaticmode == false){
         tick = false;
@@ -714,14 +1095,11 @@ void modeWarning(){
                 Semiautomaticled.state = !Semiautomaticled.state;
 
                 if( Semiautomaticled.counter < 2){
-
                     if( Semiautomaticled.state){
 
                         gioSetBit(GIO_ALIGNMENT_WARNING_LAMP_RED_PORT,GIO_ALIGNMENT_WARNING_LAMP_RED_PIN ,HIGH);//red
-
                     }else{
                         gioSetBit(GIO_ALIGNMENT_WARNING_LAMP_RED_PORT,GIO_ALIGNMENT_WARNING_LAMP_RED_PIN ,LOW);//red
-
                         Semiautomaticled.counter++;
                     }
                     canTransmit(canREG1, canMESSAGE_BOX4, can_tx_data);//id = 4
@@ -743,14 +1121,11 @@ void modeWarning(){
                 Fullautomaticled.state = !Fullautomaticled.state;
 
                 if( Fullautomaticled.counter < 2){
-
                     if( Fullautomaticled.state){
 
                         gioSetBit(GIO_ALIGNMENT_WARNING_LAMP_RED_PORT,GIO_ALIGNMENT_WARNING_LAMP_RED_PIN ,HIGH);//red
-
                     }else{
                         gioSetBit(GIO_ALIGNMENT_WARNING_LAMP_RED_PORT,GIO_ALIGNMENT_WARNING_LAMP_RED_PIN ,LOW);//red
-
                         Fullautomaticled.counter++;
                     }
                     canTransmit(canREG1, canMESSAGE_BOX4, can_tx_data);//id = 4
@@ -792,7 +1167,7 @@ void modeWarning(){
 
 }
 
-void AutoHizalamaProcess(){
+void semiAutomaticAutoHizalamaProcess(){
     if( sensorLeft == 1 && sensorRight == 1){
         gioSetBit(GIO_ALIGNMENT_VALF_RIGHT_PORT, GIO_ALIGNMENT_VALF_RIGHT_PIN,LOW);
         gioSetBit(GIO_ALIGNMENT_VALF_LEFT_PORT, GIO_ALIGNMENT_VALF_LEFT_PIN,LOW);
@@ -800,16 +1175,14 @@ void AutoHizalamaProcess(){
 
         AutoHizalamaBitti.set = 5;
         AutoHizalamaBitti.counter =0;
-
         AutoHizalama = false;
-    }else if( sensorRight == 0 && AttractiveLeftSensorAndCamelNeck >= 2500){
 
+    }else if( sensorRight == 0 && AttractiveLeftSensorAndCamelNeck >= 2500){
         gioSetBit(GIO_ALIGNMENT_VALF_RIGHT_PORT, GIO_ALIGNMENT_VALF_RIGHT_PIN,LOW);
         gioSetBit(GIO_ALIGNMENT_VALF_LEFT_PORT, GIO_ALIGNMENT_VALF_LEFT_PIN,HIGH);
         gioSetBit(GIO_PUMP_PORT,GIO_PUMP_PIN,HIGH);
 
     }else if( sensorLeft == 0 && AttractiveLeftSensorAndCamelNeck >= 2500){
-
         gioSetBit(GIO_ALIGNMENT_VALF_RIGHT_PORT, GIO_ALIGNMENT_VALF_RIGHT_PIN,HIGH);
         gioSetBit(GIO_ALIGNMENT_VALF_LEFT_PORT, GIO_ALIGNMENT_VALF_LEFT_PIN,LOW);
         gioSetBit(GIO_PUMP_PORT,GIO_PUMP_PIN,HIGH);
@@ -823,7 +1196,7 @@ void AutoHizalamaProcess(){
     }
 }
 
-void standByMode(){
+void semiAutomaticStandByMode(){
 
     ISSAktive = true;
     AcilStopON = true;
@@ -839,6 +1212,37 @@ void standByMode(){
     canTransmit(canREG1, canMESSAGE_BOX4, can_tx_data);//id = 4
 }
 
+void fullAutomaticStandBymode(){
+//    CaliberStartLed.set = 0;
+//    CaliberStopLed.set = 0;
+//    CaliberBirinciKayitLed.set =0;
+//    CaliberikinciKayitLed.set =0;
+//    CaliberKesinKayitLed.set =0;
+//    CaliberAcilStopLed.set =0;
+//    CaliberBozuk.set =0;
+//
+//    TekerlekSagLed.set =0;
+//    TekerlekSolLed.set =0;
+//    TekerlekDuzLed.set =0;
+//    CaliberBozuk.set =0;
+//
+//    BigAngle = true;
+//    SmallAngle = true;
+//    AutoHizalama = false;
+//    SystemActiveCaliber = true;
+//
+//    gioSetBit(GIO_ALIGNMENT_VALF_LEFT_PORT, GIO_ALIGNMENT_VALF_LEFT_PIN, LOW);
+//    gioSetBit(GIO_ALIGNMENT_VALF_RIGHT_PORT, GIO_ALIGNMENT_VALF_RIGHT_PIN, LOW);
+//    gioSetBit(GIO_PUMP_PORT, GIO_PUMP_PIN,LOW);
+//    CanYellowHighLow(false);
+//    CanRedHighLow(false);
+}
+
+void fullAutomaticAutoAlignmentProcess(){
+
+    full_Automatic_AutoAlignment = false;
+
+}
 ///ADS not working check global counter maybe its timer is not working
 void main(void)
 {
@@ -848,54 +1252,190 @@ void main(void)
     OutputInit();
 
     if( MCP_pinRead(GIO_FUNCTION_SELECT_PIN) ){
-
         Fullautomaticled.set = DELAY_250MS;
         //fullAutomatic = true;
     }else{
-
         Semiautomaticled.set = DELAY_250MS;
         //semiAutomatic = false;
     }
+//    /*******************************************************/
+//    //eeprom
+//    /*******************************************************/
+//    unsigned int BlockNumber;
+//    unsigned int BlockOffset, Length;
+//    unsigned char *Read_Ptr=read_data;
+//
+//    //unsigned int loop;
+//
+//    /* Initialize RAM array.*/
+//    //for(loop=0;loop<100;loop++)SpecialRamBlock[loop] = loop;
+//    SpecialRamBlock[0]= 100;
+//    SpecialRamBlock[1]= 100;
+//    SpecialRamBlock[2]= 100;
+//    SpecialRamBlock[3]= 50 ;
+//    SpecialRamBlock[4]= 100;
+//    SpecialRamBlock[5]= 100;
+//    SpecialRamBlock[6]= 100;
+//    SpecialRamBlock[7]= 50;
+//    SpecialRamBlock[8]= 100;
+//    SpecialRamBlock[9]= 200;
+//    SpecialRamBlock[10]= 200;
+//    SpecialRamBlock[11]= 50;
+//    SpecialRamBlock[12]= 200;
+//    SpecialRamBlock[13]= 50;
+//    SpecialRamBlock[14]= 200;
+//    SpecialRamBlock[15]= 50;
+//
+//    TI_Fee_Init();
+//    do
+//    {
+//        TI_Fee_MainFunction();
+//        delay();
+//        Status=TI_Fee_GetStatus(0 );
+//    }
+//    while(Status!= IDLE);
+////    TI_Fee_EraseImmediateBlock(0x1);
+////        do
+////        {
+////            TI_Fee_MainFunction();
+////            delay();
+////            Status=TI_Fee_GetStatus(0 );
+////        }
+////        while(Status!= IDLE);
+//  TI_Fee_Format(0xA5A5A5A5U);
+//    do
+//    {
+//        TI_Fee_MainFunction();
+//        delay();
+//        Status=TI_Fee_GetStatus(0 );
+//    }
+//    while(Status!= IDLE);
+//    BlockOffset = 0;
+//    Length = 0xFFFF;
+//
+//
+//    TI_Fee_Init();
+//    do
+//    {
+//        TI_Fee_MainFunction();
+//        delay();
+//        Status=TI_Fee_GetStatus(0 );
+//    }
+//
+//
+//    while(Status!= IDLE);
+//    BlockNumber=0x1;
+//    TI_Fee_WriteAsync(BlockNumber, &SpecialRamBlock[0]);
+//    do
+//    {
+//        TI_Fee_MainFunction();
+//        delay();
+//        Status=TI_Fee_GetStatus(0);
+//    }
+//    while(Status!=IDLE);
+//
+//
+//    /* Read the block with unknown length */
+//     BlockOffset = 0;
+//     Length = 0xFFFF;
+//     oResult=TI_Fee_Read(0x1,BlockOffset,Read_Ptr,Length);
+//     do
+//     {
+//         TI_Fee_MainFunction();
+//         delay();
+//         Status=TI_Fee_GetStatus(0);
+//     }
+//    while(Status!=IDLE);
+
+    /* Invalidate a written block  */
+//    TI_Fee_InvalidateBlock(BlockNumber);
+//    do
+//    {
+//        TI_Fee_MainFunction();
+//        delay();
+//        Status=TI_Fee_GetStatus(0);
+//    }
+//    while(Status!=IDLE);
+
+    /* Format bank 7 */
+    //TI_Fee_Format(0xA5A5A5A5U);
+
+     /***********************************************************/
+
 
     while(1) /* ... continue forever */
     {
+        myinput[0]=MCP_pinRead(MCP_GPA0);
+        myinput[1]=MCP_pinRead(MCP_GPA1);
+        myinput[2]=MCP_pinRead(MCP_GPA2);
+        myinput[3]=MCP_pinRead(MCP_GPA3);
+        myinput[4]=MCP_pinRead(MCP_GPA4);
+        myinput[5]=MCP_pinRead(MCP_GPA5);
+        myinput[6]=MCP_pinRead(MCP_GPA6);
+        myinput[7]=MCP_pinRead(MCP_GPA7);
+        myinput[8]=MCP_pinRead(MCP_GPB0);
+        myinput[9]=MCP_pinRead(MCP_GPB2);
+        myinput[10]=MCP_pinRead(MCP_GPB3);
+        myinput[11]=MCP_pinRead(MCP_GPB4);
+        myinput[12]=MCP_pinRead(MCP_GPB5);
+        myinput[13]=MCP_pinRead(MCP_GPB6);
+        myinput[14]=MCP_pinRead(MCP_GPB7);
+
+        //ISSActiveState = MCP_pinRead(MCP_GPB2);
+
         modeWarning();
 
-        if(Semiautomaticmode){
-            can_tx_data[3] = 0;
-            canTransmit(canREG1, canMESSAGE_BOX4, can_tx_data);//id = 4
-            if(systemActiveCheck()&& !ISSCheck()){
+ /************************************************************************************************************************************/
+ /******************************************************************************fullAutomaticmode*****************************************************/
 
-                gioSetBit(GIO_OIL_PUMP_PORT, GIO_OIL_PUMP_PIN, HIGH);
-                can_tx_data[2] = 255;
-                canTransmit(canREG1, canMESSAGE_BOX4, can_tx_data);//id = 4
 
-                if( AutoHizalama ){
-                    AutoHizalamaProcess();
-                }
+       // if( Fullautomaticmode ){
+            if(systemActiveCheck()&& ISSCheck()!=true){
 
-                if(tick){
-                    tick = false;
-                    commandsCheck();
-                    controlLeds_Semi();
-                }
-
+                if(full_Automatic_AutoAlignment){
+                    fullAutomaticAutoAlignmentProcess();
+                }else{
+                    fullAutomaticCommandCheck();
+                    fullAutomaticControlLeds();
+                }//full_Automatic_AutoAlignment
 
             }else{
-                standByMode();
-            }
+                fullAutomaticStandBymode();
+            }//systemActiveCheck
 
-        }//Semiautomaticmode
+       // }//Fullautomaticmode
+
+ /************************************************************************************************************************************/
+ /******************************************************************************Semiautomaticmode*****************************************************/
+
+//        if(Semiautomaticmode){
+//            can_tx_data[3] = 0;
+//            canTransmit(canREG1, canMESSAGE_BOX4, can_tx_data);//id = 4
+//            if(systemActiveCheck()&& ISSCheck()!=true){
+//
+//                gioSetBit(GIO_OIL_PUMP_PORT, GIO_OIL_PUMP_PIN, HIGH);
+//                can_tx_data[2] = 255;
+//                canTransmit(canREG1, canMESSAGE_BOX4, can_tx_data);//id = 4
+//
+//                if( AutoHizalama ){
+//                    semiAutomaticAutoHizalamaProcess();
+//                }
+//
+//                if(tick){
+//                    tick = false;
+//                    semiAutomaticCommandsCheck();
+//                    semiAutomaticControlLeds();
+//                }
+//
+//            }else{
+//                semiAutomaticStandByMode();
+//            }
+//
+//        }//Semiautomaticmode
 
     }//while(1)
 }//main
 
-
-
-void wait(uint32 time)
-{
-    while(time){time--;};
-}
 
 void rtiNotification(uint32 notification)
 {
@@ -904,6 +1444,7 @@ void rtiNotification(uint32 notification)
         tick=true;
         canMessageCheck();
         getSensorAndCamelNeckValue();
+        MCUADCread();
 //        printf("%d \n",1);
 //    }
 
