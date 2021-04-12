@@ -86,7 +86,9 @@ enum substeps{
 
 uint16_t rcvId[] = { 0xC28B, 0xD28B, 0xE28B, 0xF28B };
 uint16_t ADS1018Data[4];
-
+uint16_t Amount;
+uint16_t Average;
+uint16_t adc_samplecounter;
 
 uint8 PumpSlaveBtn = 0;
 bool fullPumpState = false;
@@ -162,6 +164,31 @@ Led CaliberBozuk;
 Led OnSensorAriza;
 Led ArkaSensorAriza;
 
+typedef struct timer{
+    uint16_t set;
+    uint16_t count;
+    bool state;
+    uint16_t counter;
+}Timers;
+
+Timers Calibrationbegin;
+Timers CalibrationFirstTemprorySettings;
+Timers CalibrationSecondTemprorySettings;
+Timers CalibrationFinalSettings;
+Timers CalibrationCancel;
+Timers CalibrationFailure;
+
+Timers FifthWheelAnglePositioneLeft;
+Timers FifthWheelAnglePositioneRight;
+Timers VehicleInRoute;
+
+Timers AutomaticAligmentDone;
+Timers ISSSingalActive;
+Timers FrontSensorInoperative;
+Timers BackSensorInoperative;
+
+Timers EmergencyStopActive;
+
 
 typedef struct buttons{
 
@@ -202,7 +229,7 @@ bool BigAngle = true;
 bool SmallAngle = true;
 
 uint16_t LevelState = 0;
-uint16_t sensorData;
+uint16_t canSensorData;
 uint8_t aligment_set_level = 0;
 bool PumpState = false;
 
@@ -550,21 +577,21 @@ void canMessageCheck(){
     }
 
 //
-//    if( Fullautomaticmode ){
-//
-//        //ValueToAngle(e2prom_read_value.CamelneckHome, e2prom_read_value.CamelneckNumber, AttractiveLeftSensorAndCamelNeck);
-//        //HedefAci(DegerSonuc);
-//        //AngleToValue(e2prom_read_value.FifthWheelHome, e2prom_read_value.FifthWheelNumber, AngleValue);
-//
-//        sensorData = can_rx_data[0];
-//        sensorData <<= 8;
-//        sensorData |= can_rx_data[1];
-//
-//        PumpSlaveBtn =  can_rx_data[2];
+    if( Fullautomaticmode ){
+
+        //ValueToAngle(e2prom_read_value.CamelneckHome, e2prom_read_value.CamelneckNumber, AttractiveLeftSensorAndCamelNeck);
+        //HedefAci(DegerSonuc);
+        //AngleToValue(e2prom_read_value.FifthWheelHome, e2prom_read_value.FifthWheelNumber, AngleValue);
+
+        canSensorData = can_rx_data[0];
+        canSensorData <<= 8;
+        canSensorData |= can_rx_data[1];
+
+        PumpSlaveBtn =  can_rx_data[2];
 //
 //        if( Caliberundefined == true){
 //
-//            if( sensorData >= (AciSonuc - 5)  && sensorData <= (AciSonuc + 5) ){
+//            if( canSensorData >= (AciSonuc - 5)  && canSensorData <= (AciSonuc + 5) ){
 //
 //                AutoHizalamaState = false;
 //
@@ -575,7 +602,7 @@ void canMessageCheck(){
 //                OnSensorAriza.set =0;
 //                ArkaSensorAriza.set =0;
 //
-// //           }else if( sensorData <  AciSonuc  && sensorData > e2prom_read_value.FifthWheelLeftAngle){
+// //           }else if( canSensorData <  AciSonuc  && canSensorData > e2prom_read_value.FifthWheelLeftAngle){
 //
 //                AutoHizalamaState = true;
 //
@@ -586,7 +613,7 @@ void canMessageCheck(){
 //                OnSensorAriza.set =0;
 //                ArkaSensorAriza.set =0;
 //
-// //           }else if( sensorData > AciSonuc  && sensorData < e2prom_read_value.FifthWheelRightAngle ){
+// //           }else if( canSensorData > AciSonuc  && canSensorData < e2prom_read_value.FifthWheelRightAngle ){
 //                AutoHizalamaState = true;
 //
 //                TekerlekDuzLed.set =0;
@@ -596,8 +623,8 @@ void canMessageCheck(){
 //                OnSensorAriza.set =0;
 //                ArkaSensorAriza.set =0;
 //
-////            }else if( sensorData  < (e2prom_read_value.FifthWheelLeftAngle - 300)){
-////                if(sensorData  < (e2prom_read_value.FifthWheelLeftAngle - 350)){
+////            }else if( canSensorData  < (e2prom_read_value.FifthWheelLeftAngle - 300)){
+////                if(canSensorData  < (e2prom_read_value.FifthWheelLeftAngle - 350)){
 //                    CaliberBozuk.set = DELAY_250MS;
 //
 //                    TekerlekDuzLed.set =0;
@@ -613,8 +640,8 @@ void canMessageCheck(){
 //                    OnSensorAriza.set =0;
 //                    ArkaSensorAriza.set = DELAY_250MS;
 //                //}
-////            }else if( sensorData > (e2prom_read_value.FifthWheelRightAngle + 300)){
-////                if(sensorData  > (e2prom_read_value.FifthWheelRightAngle + 350)){
+////            }else if( canSensorData > (e2prom_read_value.FifthWheelRightAngle + 300)){
+////                if(canSensorData  > (e2prom_read_value.FifthWheelRightAngle + 350)){
 //                    CaliberBozuk.set = DELAY_250MS;
 //
 //                    TekerlekDuzLed.set =0;
@@ -666,7 +693,7 @@ void canMessageCheck(){
 //               // }
 //            }
 //        }
-//    }
+    }
 
 }
 
@@ -680,7 +707,9 @@ bool systemActiveCheck(){
 bool ISSCheck(){
 
         ISSActiveState = MCP_pinRead(MCP_GPB2);
-
+        if(ISSActiveState){
+           ISSSingalActive.set = DELAY_1S; //need to edit according to documents
+        }
     return ISSActiveState;
 }
 
@@ -692,6 +721,25 @@ void getSensorAndCamelNeckValue(){
             AttractiveLeftSensorAndCamelNeck = ADS1018Data[2];
         }
     }
+
+    if( Fullautomaticmode ){
+        if(ADS1018Data[2] != AttractiveLeftSensorAndCamelNeck){
+            if( adc_samplecounter <= 20)
+                Amount += ADS1018Data[2];
+
+            if( adc_samplecounter == 20 )
+                Average = Amount/20;
+
+            if( adc_samplecounter > 20 )
+                Average = ( Average * 19 + ADS1018Data[2] ) / 20;
+
+            if( adc_samplecounter < 21)
+                adc_samplecounter++;
+
+            AttractiveLeftSensorAndCamelNeck = Average;
+            //AttractiveRightSensor = ui32ADC0Value[0];
+        }
+     }
 }
 
 
@@ -817,28 +865,29 @@ void semiAutomaticAligmentCommandsCheck(){
 void setAligmentProcess(){
 if(aligment_set_level == 1){
     printf("level 1 saving\n");
-//        if( AttractiveLeftSensorAndCamelNeck > CamelneckHomeTemporary){
-//
-//              CamelneckRightAngleTemporary = AttractiveLeftSensorAndCamelNeck;
-//              CamelneckNumberValue = -1 *(CamelneckHomeTemporary - CamelneckRightAngleTemporary);
-//              CamelneckLeftAngleTemporary = CamelneckHomeTemporary - CamelneckNumberValue;
-//              CamelneckNumberTemporary = CamelneckNumberValue / 90;
-//
-//              FifthWheelRightAngleTemporary = sensorData;
-//              FifthWheelNumberValue = -1 * (FifthWheelHomeTemporary - FifthWheelRightAngleTemporary);
-//              FifthWheelLeftAngleTemporary = FifthWheelHomeTemporary - FifthWheelNumberValue;
-//              FifthWheelNumberTemporary = FifthWheelNumberValue / 38;
-//          }else{
-//              CamelneckLeftAngleTemporary = AttractiveLeftSensorAndCamelNeck;
-//              CamelneckNumberValue = CamelneckHomeTemporary - CamelneckLeftAngleTemporary;
-//              CamelneckRightAngleTemporary = CamelneckHomeTemporary + CamelneckNumberValue;
-//              CamelneckNumberTemporary = CamelneckNumberValue / 90;
-//
-//              FifthWheelLeftAngleTemporary = sensorData;
-//              FifthWheelNumberValue = FifthWheelHomeTemporary - FifthWheelLeftAngleTemporary;
-//              FifthWheelRightAngleTemporary = FifthWheelHomeTemporary + FifthWheelNumberValue;
-//              FifthWheelNumberTemporary = FifthWheelNumberValue / 38;
-//          }
+    printf("yellow and red lamp on keep\n");
+    if( AttractiveLeftSensorAndCamelNeck > CamelneckHomeTemporary){
+
+              CamelneckRightAngleTemporary = AttractiveLeftSensorAndCamelNeck;
+              CamelneckNumberValue = -1 *(CamelneckHomeTemporary - CamelneckRightAngleTemporary);
+              CamelneckLeftAngleTemporary = CamelneckHomeTemporary - CamelneckNumberValue;
+              CamelneckNumberTemporary = CamelneckNumberValue / 90;
+
+              FifthWheelRightAngleTemporary = canSensorData;
+              FifthWheelNumberValue = -1 * (FifthWheelHomeTemporary - FifthWheelRightAngleTemporary);
+              FifthWheelLeftAngleTemporary = FifthWheelHomeTemporary - FifthWheelNumberValue;
+              FifthWheelNumberTemporary = FifthWheelNumberValue / 38;
+          }else{
+              CamelneckLeftAngleTemporary = AttractiveLeftSensorAndCamelNeck;
+              CamelneckNumberValue = CamelneckHomeTemporary - CamelneckLeftAngleTemporary;
+              CamelneckRightAngleTemporary = CamelneckHomeTemporary + CamelneckNumberValue;
+              CamelneckNumberTemporary = CamelneckNumberValue / 90;
+
+              FifthWheelLeftAngleTemporary = canSensorData;
+              FifthWheelNumberValue = FifthWheelHomeTemporary - FifthWheelLeftAngleTemporary;
+              FifthWheelRightAngleTemporary = FifthWheelHomeTemporary + FifthWheelNumberValue;
+              FifthWheelNumberTemporary = FifthWheelNumberValue / 38;
+          }
 
         aligment_set_level = 2;
 
@@ -925,6 +974,7 @@ void fullAutomaticAligmentCommandsCheck(){
                 if(full_Automatic_Set_Aligment){
                     printf("right save\n");
                     setAligmentProcess();
+                    CalibrationSecondTemprorySettings.set = DELAY_1S;//need to edit accord the documents
                 }else{}
             }else{
                 gioSetBit(GIO_ALIGNMENT_VALF_RIGHT_PORT, GIO_ALIGNMENT_VALF_RIGHT_PIN, LOW);
@@ -939,6 +989,7 @@ void fullAutomaticAligmentCommandsCheck(){
                 if(full_Automatic_Set_Aligment){
                     printf("left save\n");
                     setAligmentProcess();
+                    CalibrationSecondTemprorySettings.set = DELAY_1S;//need to edit accord the documents
                 }else{}
             }else{
                 gioSetBit(GIO_ALIGNMENT_VALF_LEFT_PORT, GIO_ALIGNMENT_VALF_LEFT_PIN, LOW);
@@ -952,9 +1003,11 @@ void fullAutomaticAligmentCommandsCheck(){
                     if(aligment_set_level == 0){
                         printf("home save\n");
                         //take neckangle as  neck angle Home
-                        //take sensordata as FifthWheel Home
-                        CamelneckHomeTemporary = AttractiveLeftSensorAndCamelNeck;
-                        FifthWheelHomeTemporary = sensorData;
+                        //take canSensorData as FifthWheel Home
+                        CamelneckHomeTemporary = AttractiveLeftSensorAndCamelNeck;  //from ads1018[2]
+                        FifthWheelHomeTemporary = canSensorData;   //from canbus
+                        printf("red lamp on keep\n");
+                        CalibrationFirstTemprorySettings.set = DELAY_500MS;
                         aligment_set_level = 1;
                     }
                 }else{
@@ -966,6 +1019,7 @@ void fullAutomaticAligmentCommandsCheck(){
         case 8:
             if(emergency_stop == false){
                 full_Automatic_Set_Aligment = true;
+                Calibrationbegin.set = DELAY_500MS;
             }
             break;
 
@@ -976,8 +1030,8 @@ void fullAutomaticAligmentCommandsCheck(){
                     printf("saved\n");
                     printf("saved\n");
                     aligment_set_level = 0;
-
-                    //save settings
+                    printf("yellow and red lamp off\n");
+                    CalibrationFinalSettings.set = DELAY_250MS;
                 }
 
             }else{
@@ -987,8 +1041,9 @@ void fullAutomaticAligmentCommandsCheck(){
 
         case 16:
             emergency_stop = true;
-
+            EmergencyStopActive.set = DELAY_250MS;
             break;
+
         default:
             gioSetBit(GIO_ALIGNMENT_VALF_RIGHT_PORT, GIO_ALIGNMENT_VALF_RIGHT_PIN, LOW);
             gioSetBit(GIO_ALIGNMENT_VALF_LEFT_PORT, GIO_ALIGNMENT_VALF_LEFT_PIN, LOW);
@@ -997,6 +1052,255 @@ void fullAutomaticAligmentCommandsCheck(){
 
     }
 }
+
+void fullAutomaticControlLeds(){
+    if(tick){
+        tick=false;
+/***********************************************************EmergencyStopActive********************************************************************/
+        if(EmergencyStopActive.set != 0){
+            if(++EmergencyStopActive.count >= EmergencyStopActive.set){
+
+                EmergencyStopActive.state=!EmergencyStopActive.state;
+                EmergencyStopActive.count = 0;
+
+               if(EmergencyStopActive.state){
+                   printf("yellow and red lamp on x1 for 250ms\n");
+                   EmergencyStopActive.counter++;
+               }else{
+                   printf("yellow and red lamp off x1 for 250ms\n");
+                   if(Calibrationbegin.counter>=1){
+                       EmergencyStopActive.set = 0;
+                       EmergencyStopActive.counter = 0;
+                   }
+               }
+           }
+       }//EmergencyStopActive
+/***********************************************************FrontSensorInoperative********************************************************************/
+        if(FrontSensorInoperative.set != 0){
+            if(++FrontSensorInoperative.count >= FrontSensorInoperative.set){
+
+                FrontSensorInoperative.state=!FrontSensorInoperative.state;
+                FrontSensorInoperative.count = 0;
+
+               if(FrontSensorInoperative.state){
+                   printf("yellow lamp on x1 for 250ms\n");
+                   FrontSensorInoperative.counter++;
+               }else{
+                   printf("yellow lamp off x1 for 250ms\n");
+                   if(FrontSensorInoperative.counter>=1){
+                       FrontSensorInoperative.set = 0;
+                       FrontSensorInoperative.counter = 0;
+                   }
+               }
+           }
+       }//FrontSensorInoperative
+/***********************************************************BackSensorInoperative********************************************************************/
+        if(BackSensorInoperative.set != 0){
+            if(++BackSensorInoperative.count >= BackSensorInoperative.set){
+
+                BackSensorInoperative.state=!BackSensorInoperative.state;
+                BackSensorInoperative.count = 0;
+
+               if(BackSensorInoperative.state){
+                   printf("red lamp on x1 for 250ms\n");
+                   BackSensorInoperative.counter++;
+               }else{
+                   printf("red lamp off x1 for 250ms\n");
+                   if(BackSensorInoperative.counter>=1){
+                       BackSensorInoperative.set = 0;
+                       BackSensorInoperative.counter = 0;
+                   }
+               }
+           }
+       }//BackSensorInoperative
+/***********************************************************Calibrationbegin********************************************************************/
+
+        if(Calibrationbegin.set != 0){
+            if(++Calibrationbegin.count >= Calibrationbegin.set){
+
+                Calibrationbegin.state=!Calibrationbegin.state;
+                Calibrationbegin.count = 0;
+
+               if(Calibrationbegin.state){
+                   printf("yellow and red lamp on x1 for 500ms\n");
+                   Calibrationbegin.counter++;
+               }else{
+                   printf("yellow and red lamp off x1 for 500ms\n");
+                   if(Calibrationbegin.counter>=1){
+                       Calibrationbegin.set = 0;
+                       Calibrationbegin.counter = 0;
+                   }
+               }
+           }
+       }//Calibrationbegin
+/***********************************************************CalibrationFirstTemprorySettings********************************************************************/
+
+        if(CalibrationFirstTemprorySettings.set != 0){
+            if(++CalibrationFirstTemprorySettings.count >= CalibrationFirstTemprorySettings.set){
+
+                CalibrationFirstTemprorySettings.state=!CalibrationFirstTemprorySettings.state;
+                CalibrationFirstTemprorySettings.count = 0;
+
+               if(CalibrationFirstTemprorySettings.state){
+                   printf("red lamp on x1 for 500ms and yellow keep\n");
+                   CalibrationFirstTemprorySettings.counter++;
+               }else{
+                   //red lamp off x1 for 250ms
+                   printf("red lamp off x1 for 500ms and yellow keep\n");
+                   if(CalibrationFirstTemprorySettings.counter>=1){
+                       CalibrationFirstTemprorySettings.set = 0;
+                       CalibrationFirstTemprorySettings.counter = 0;
+                   }
+               }
+           }
+       }//CalibrationFirstTemprorySettings
+/***********************************************************CalibrationSecondTemprorySettings********************************************************************/
+
+        if(CalibrationSecondTemprorySettings.set != 0){
+            if(++CalibrationSecondTemprorySettings.count >= CalibrationSecondTemprorySettings.set){
+
+                CalibrationSecondTemprorySettings.state=!CalibrationSecondTemprorySettings.state;
+                CalibrationSecondTemprorySettings.count = 0;
+
+               if(CalibrationSecondTemprorySettings.state){
+                   printf("yellow and red lamp on keep\n");
+                   CalibrationSecondTemprorySettings.counter++;
+               }else{
+                   if(CalibrationSecondTemprorySettings.counter>=1){
+                       CalibrationSecondTemprorySettings.set = 0;
+                       CalibrationSecondTemprorySettings.counter = 0;
+                   }
+               }
+           }
+       }//CalibrationSecondTemprorySettings
+/***********************************************************CalibrationFinalSettings********************************************************************/
+
+        if(CalibrationFinalSettings.set != 0){
+            if(++CalibrationFinalSettings.count >= CalibrationFinalSettings.set){
+
+                CalibrationFinalSettings.state=!CalibrationFinalSettings.state;
+                CalibrationFinalSettings.count = 0;
+
+               if(CalibrationFinalSettings.state){
+                   printf("yellow and red lamp on 250 x3\n");
+                   CalibrationFinalSettings.counter++;
+               }else{
+                   printf("yellow and red lamp off 250 x3\n");
+                   if(CalibrationFinalSettings.counter>=3){
+                       printf("red lamp off x1 for 500ms and yellow off after finish calibration\n");
+                       printf("yellow and red lamp off  after finish calibration\n");
+                       CalibrationFinalSettings.set = 0;
+                       CalibrationFinalSettings.counter = 0;
+                   }
+               }
+           }
+       }//CalibrationFinalSettings
+/***********************************************************CalibrationCancel********************************************************************/
+
+        if(CalibrationCancel.set != 0){
+            if(++CalibrationCancel.count >= CalibrationCancel.set){
+
+                CalibrationCancel.state=!CalibrationCancel.state;
+                CalibrationCancel.count = 0;
+
+               if(CalibrationCancel.state){
+                   printf("yellow lamp on 500 x2  //red lamp on 2saniye x1 \n");
+                   CalibrationCancel.counter++;
+               }else{
+                   printf("yellow lamp off 500 x2  //red lamp on 2saniye x1 \n");
+                   if(CalibrationCancel.counter>=3){
+                       printf("yellow lamp off 500 x2  //red lamp off 2saniye x1 \n");
+                       CalibrationCancel.set = 0;
+                       CalibrationCancel.counter = 0;
+                   }
+               }
+           }
+       }//CalibrationCancel
+/***********************************************************CalibrationFailure********************************************************************/
+
+        if(CalibrationFailure.set != 0){
+            if(++CalibrationFailure.count >= CalibrationFailure.set){
+
+                CalibrationFailure.state=!CalibrationFailure.state;
+                CalibrationFailure.count = 0;
+
+               if(CalibrationFailure.state){
+                   printf("yellow and red lamp on 250 x2\n");
+                   CalibrationFailure.counter++;
+               }else{
+                   printf("yellow and red lamp off 250 x2\n");
+                   if(CalibrationFailure.counter>=2){
+                       CalibrationFailure.set = 0;
+                       CalibrationFailure.counter = 0;
+                   }
+               }
+           }
+       }//CalibrationFailure
+/***********************************************************ISSSingalActive********************************************************************/
+
+        if(ISSSingalActive.set != 0){
+            if(++ISSSingalActive.count >= ISSSingalActive.set){
+
+                ISSSingalActive.state=!ISSSingalActive.state;
+                ISSSingalActive.count = 0;
+
+               if(ISSSingalActive.state){
+                   printf("yellow and red lamp on 250 x1\n");
+                   ISSSingalActive.counter++;
+               }else{
+                   printf("yellow and red lamp off 250 x1\n");
+                   if(ISSSingalActive.counter>=1){
+                       ISSSingalActive.set = 0;
+                       ISSSingalActive.counter = 0;
+                   }
+               }
+           }
+       }//ISSSingalActive
+/***********************************************************AutomaticAligmentDone********************************************************************/
+
+        if(AutomaticAligmentDone.set != 0){
+            if(++AutomaticAligmentDone.count >= AutomaticAligmentDone.set){
+
+                AutomaticAligmentDone.state=!AutomaticAligmentDone.state;
+                AutomaticAligmentDone.count = 0;
+
+               if(AutomaticAligmentDone.state){
+                   printf("yellow and red lamp on 250 x2\n");
+                   AutomaticAligmentDone.counter++;
+               }else{
+                   printf("yellow and red lamp off 250 x2\n");
+                   if(AutomaticAligmentDone.counter>=2){
+                       AutomaticAligmentDone.set = 0;
+                       AutomaticAligmentDone.counter = 0;
+                   }
+               }
+           }
+       }//AutomaticAligmentDone
+/***********************************************************AutomaticAligmentDone********************************************************************/
+
+        if(VehicleInRoute.set != 0){
+            if(++VehicleInRoute.count >= VehicleInRoute.set){
+
+                VehicleInRoute.state=!VehicleInRoute.state;
+                VehicleInRoute.count = 0;
+
+               if(VehicleInRoute.state){
+                   //printf("yellow and red lamp on keep\n");
+                   VehicleInRoute.counter++;
+               }else{
+                   //printf("yellow and red lamp on keep\n");
+                   if(VehicleInRoute.counter>=1){
+                       VehicleInRoute.set = 0;
+                       VehicleInRoute.counter = 0;
+                   }
+               }
+           }
+       }//VehicleInRoute
+
+    }//tick
+
+}
+
 void semiAutomaticControlLeds( void ){
 
     if( AutoHizalamaBitti.set !=0 ){
@@ -1070,9 +1374,7 @@ void semiAutomaticControlLeds( void ){
     }//CaliberAcilStopLed.set
 }
 
-void fullAutomaticControlLeds(){
 
-}
 
 void semiAutomaticCommandsCheck(){
     semiAutomaticPumpCheck();
@@ -1241,6 +1543,7 @@ void fullAutomaticStandBymode(){
 void fullAutomaticAutoAlignmentProcess(){
 
     full_Automatic_AutoAlignment = false;
+    printf(" red and yellow lamp on");
 
 }
 ///ADS not working check global counter maybe its timer is not working
@@ -1365,21 +1668,21 @@ void main(void)
 
     while(1) /* ... continue forever */
     {
-        myinput[0]=MCP_pinRead(MCP_GPA0);
-        myinput[1]=MCP_pinRead(MCP_GPA1);
-        myinput[2]=MCP_pinRead(MCP_GPA2);
-        myinput[3]=MCP_pinRead(MCP_GPA3);
-        myinput[4]=MCP_pinRead(MCP_GPA4);
-        myinput[5]=MCP_pinRead(MCP_GPA5);
-        myinput[6]=MCP_pinRead(MCP_GPA6);
-        myinput[7]=MCP_pinRead(MCP_GPA7);
-        myinput[8]=MCP_pinRead(MCP_GPB0);
-        myinput[9]=MCP_pinRead(MCP_GPB2);
-        myinput[10]=MCP_pinRead(MCP_GPB3);
-        myinput[11]=MCP_pinRead(MCP_GPB4);
-        myinput[12]=MCP_pinRead(MCP_GPB5);
-        myinput[13]=MCP_pinRead(MCP_GPB6);
-        myinput[14]=MCP_pinRead(MCP_GPB7);
+//        myinput[0]=MCP_pinRead(MCP_GPA0);
+//        myinput[1]=MCP_pinRead(MCP_GPA1);
+//        myinput[2]=MCP_pinRead(MCP_GPA2);
+//        myinput[3]=MCP_pinRead(MCP_GPA3);
+//        myinput[4]=MCP_pinRead(MCP_GPA4);
+//        myinput[5]=MCP_pinRead(MCP_GPA5);
+//        myinput[6]=MCP_pinRead(MCP_GPA6);
+//        myinput[7]=MCP_pinRead(MCP_GPA7);
+//        myinput[8]=MCP_pinRead(MCP_GPB0);
+//        myinput[9]=MCP_pinRead(MCP_GPB2);
+//        myinput[10]=MCP_pinRead(MCP_GPB3);
+//        myinput[11]=MCP_pinRead(MCP_GPB4);
+//        myinput[12]=MCP_pinRead(MCP_GPB5);
+//        myinput[13]=MCP_pinRead(MCP_GPB6);
+//        myinput[14]=MCP_pinRead(MCP_GPB7);
 
         //ISSActiveState = MCP_pinRead(MCP_GPB2);
 
