@@ -130,6 +130,7 @@ int CamelneckHomeTemporary;
 int CamelneckRightAngleTemporary;
 int CamelneckLeftAngleTemporary;
 float CamelneckNumberTemporary;
+int CamelneckNumberTemporaryinteger;
 
 int FifthWheelHomeTemporary;
 int FifthWheelRightAngleTemporary;
@@ -224,11 +225,7 @@ uint16_t AttractiveLeftSensorAndCamelNeck; // Sensor 2
 
 
 /**************************************************************************/
-int AciSonuc =0;
-bool BigAngle = true;
-bool SmallAngle = true;
 
-uint16_t LevelState = 0;
 uint16_t canSensorData;
 uint8_t aligment_set_level = 0;
 bool PumpState = false;
@@ -265,9 +262,14 @@ uint16_t adress_value = 0;
 //eeprom
 uint16 u16JobResult,Status;
 Std_ReturnType oResult=E_OK;
+
+unsigned int BlockNumber;
+uint8 SpecialRamBlock[16];
+uint8 EepromData[16];
+
+unsigned int BlockOffset, Length;
 unsigned char read_data[100]={0};
 
-uint8 SpecialRamBlock[100]={1,2,3,4,5,7,7,4,4};
 
 unsigned char pattern;
 uint16 u16writecounter;
@@ -277,6 +279,9 @@ unsigned char VsState, u8EEPIndex;
 unsigned char u8VirtualSector;
 uint8 Test_Recovery;
 uint8 Test_Cancel;
+
+uint16_t AciSonuc ;
+uint16_t DegerSonuc ;
 
 void delay(void)
 {
@@ -544,17 +549,114 @@ void InputInit(){
 }
 
 void AngleToValue ( int Home , int KatSayi , int Aci ){
-    uint16_t AciSonuc = Home + ( KatSayi * (Aci) );
+    AciSonuc = Home + ( KatSayi * (Aci) );
 }
 
 void ValueToAngle ( int Home , int KatSayi , int Sensor ){
-    uint16_t DegerSonuc =  ( Sensor - Home ) / KatSayi;
+    DegerSonuc =  ( Sensor - Home ) / KatSayi;
 }
 
 void HedefAci ( float Aci){
    uint16_t AngleValue = 41 * sin(Aci/68);
 }
 
+void epromWrite(unsigned int Block_NO,uint8 eeprom_Data[16] ){
+
+    //unsigned int loop;
+
+    /* Initialize RAM array.*/
+    for(int i = 0;i<=sizeof(SpecialRamBlock);i++ ){
+        SpecialRamBlock[i] = eeprom_Data[i];
+    }
+
+
+    TI_Fee_Init();
+    do
+    {
+        TI_Fee_MainFunction();
+        delay();
+        Status=TI_Fee_GetStatus(0);
+    }
+    while(Status!= IDLE);
+//    TI_Fee_EraseImmediateBlock(0x1);
+//        do
+//        {
+//            TI_Fee_MainFunction();
+//            delay();
+//            Status=TI_Fee_GetStatus(0 );
+//        }
+//        while(Status!= IDLE);
+  TI_Fee_Format(0xA5A5A5A5U);
+    do
+    {
+        TI_Fee_MainFunction();
+        delay();
+        Status=TI_Fee_GetStatus(0 );
+    }
+    while(Status!= IDLE);
+    BlockOffset = 0;
+    Length = 0xFFFF;
+
+
+    TI_Fee_Init();
+    do
+    {
+        TI_Fee_MainFunction();
+        delay();
+        Status=TI_Fee_GetStatus(0 );
+    }
+    while(Status!= IDLE);
+
+    BlockNumber=0x1;
+    TI_Fee_WriteAsync(Block_NO, &SpecialRamBlock[0]);
+    do
+    {
+        TI_Fee_MainFunction();
+        delay();
+        Status=TI_Fee_GetStatus(0);
+    }
+    while(Status!=IDLE);
+
+}
+
+void eepromRead(unsigned int Block_NO,uint8 eeprom_Data_RX[16]){
+        /* Read the block with unknown length */
+        unsigned char *Read_Ptr=eeprom_Data_RX;
+
+        TI_Fee_Init();
+        do
+        {
+            TI_Fee_MainFunction();
+            delay();
+            Status=TI_Fee_GetStatus(0 );
+        }
+
+
+        while(Status!= IDLE);
+
+         BlockOffset = 0;
+         Length = 0xFFFF;
+         oResult=TI_Fee_Read(Block_NO,BlockOffset,Read_Ptr,Length);
+         do
+         {
+             TI_Fee_MainFunction();
+             delay();
+             Status=TI_Fee_GetStatus(0);
+         }
+        while(Status!=IDLE);
+        /* Invalidate a written block  */
+//        TI_Fee_InvalidateBlock(BlockNumber);
+//        do
+//        {
+//            TI_Fee_MainFunction();
+//            delay();
+//            Status=TI_Fee_GetStatus(0);
+//        }
+//        while(Status!=IDLE);
+
+        /* Format bank 7 */
+        //TI_Fee_Format(0xA5A5A5A5U);
+}
 void canMessageCheck(){
 
     if(!canIsRxMessageArrived(canREG1, canMESSAGE_BOX1)){
@@ -782,27 +884,7 @@ void semiAutomaticPumpCheck(){
 
 }
 
-void fullAutomaticPumpCheck(){
-    if ( PumpSlaveBtn ){ //Button Push UP
 
-         gioSetBit(GIO_PUMP_PORT, GIO_PUMP_PIN , HIGH);
-
-//         DataDizi[4] = 1;
-//         CANMessageSet(CAN0_BASE, 2, &Can_TX_Message, MSG_OBJ_TYPE_TX);
-
-         PumpState = true;
-     }else{
-         if( PumpState == true){
-
-             gioSetBit(GIO_PUMP_PORT, GIO_PUMP_PIN , LOW);
-
-//             DataDizi[4] = 0;
-//             CANMessageSet(CAN0_BASE, 2, &Can_TX_Message, MSG_OBJ_TYPE_TX);
-
-             PumpState = false;
-         }
-     }
-}
 void semiAutomaticAligmentCommandsCheck(){
     if( !AutoHizalama ){
 
@@ -874,10 +956,32 @@ void semiAutomaticAligmentCommandsCheck(){
 
 }
 
+/*-----------------------------------------------------------------------------------------------------------------------------------------*/
+void fullAutomaticPumpCheck(){
+
+    if ( PumpSlaveBtn ){ //Button Push UP
+         gioSetBit(GIO_PUMP_PORT, GIO_PUMP_PIN , HIGH);
+
+//         DataDizi[4] = 1;
+//         CANMessageSet(CAN0_BASE, 2, &Can_TX_Message, MSG_OBJ_TYPE_TX);
+
+         PumpState = true;
+     }else{
+         if( PumpState == true){
+             gioSetBit(GIO_PUMP_PORT, GIO_PUMP_PIN , LOW);
+
+//             DataDizi[4] = 0;
+//             CANMessageSet(CAN0_BASE, 2, &Can_TX_Message, MSG_OBJ_TYPE_TX);
+
+             PumpState = false;
+         }
+     }
+}
+
+/*-----------------------------------------------------------------------------------------------------------------------------------------*/
 void setAligmentProcess(){
+
 if(aligment_set_level == 1){
-    printf("level 1 saving\n");
-    printf("yellow and red lamp on keep\n");
     if( AttractiveLeftSensorAndCamelNeck > CamelneckHomeTemporary){
 
               CamelneckRightAngleTemporary = AttractiveLeftSensorAndCamelNeck;
@@ -906,8 +1010,10 @@ if(aligment_set_level == 1){
     }
 }
 
+/*-----------------------------------------------------------------------------------------------------------------------------------------*/
 void commandButtonscheck(){
 
+/*********************************************************************** AlignmentRight button bottun pressed***/
     //here we need to try enum and create one function
     if ( AlignmentRight != MCP_pinRead(GIO_ALIGNMENT_RIGHT_BTN_PIN)){
         if (AlignmentRight = MCP_pinRead(GIO_ALIGNMENT_RIGHT_BTN_PIN)){ //Button Push UP
@@ -919,7 +1025,7 @@ void commandButtonscheck(){
             right_aligment = false;
         }
     }
-
+/*********************************************************************** AlignmentLeft button bottun pressed***/
     if ( AlignmentLeft != MCP_pinRead(GIO_ALIGNMENT_LEFT_BTN_PIN) ){
         if ((AlignmentLeft = MCP_pinRead(GIO_ALIGNMENT_LEFT_BTN_PIN)) ){
 
@@ -931,7 +1037,7 @@ void commandButtonscheck(){
         }
     }
 
-
+/************************************************************************* Auto mode button bottun pressed***/
     if ( AlignmentAuto != MCP_pinRead(GIO_ALIGNMENT_AUTO_BTN_PIN) ){
         if ((AlignmentAuto = MCP_pinRead(GIO_ALIGNMENT_AUTO_BTN_PIN)) ){
 
@@ -942,7 +1048,7 @@ void commandButtonscheck(){
             auto_aligment =false;
         }
     }
-
+/************************************************************************ Set mode button bottun pressed***/
     if ( SetMode != MCP_pinRead(GIO_ALIGNMENT_SET_BTN_PIN) ){
         if ((SetMode = MCP_pinRead(GIO_ALIGNMENT_SET_BTN_PIN)) ){
 
@@ -953,7 +1059,7 @@ void commandButtonscheck(){
             set_aligment = false;
         }
     }
-
+/************************************************************************ Emergency stop bottun pressed***/
     if ( StopMode != MCP_pinRead(GIO_STOP_BTN_PIN) ){
         if ((StopMode = MCP_pinRead(GIO_STOP_BTN_PIN)) ){
 
@@ -972,40 +1078,25 @@ void commandButtonscheck(){
 
 }
 
+/*-----------------------------------------------------------------------------------------------------------------------------------------*/
 void fullAutomaticAligmentCommandsCheck(){
 
     commandButtonscheck();
 
 
     switch (aligment_buf) {
+/******************************************************************************** No bottun pressed***/
         case 0:
             gioSetBit(GIO_ALIGNMENT_VALF_RIGHT_PORT, GIO_ALIGNMENT_VALF_RIGHT_PIN, LOW);
             gioSetBit(GIO_ALIGNMENT_VALF_LEFT_PORT, GIO_ALIGNMENT_VALF_LEFT_PIN, LOW);
             gioSetBit(GIO_PUMP_PORT, GIO_PUMP_PIN, LOW);
             if(full_Automatic_Set_Aligment == false){
-                gioSetBit(GIO_ALIGNMENT_WARNING_LAMP_RED_PORT, GIO_ALIGNMENT_WARNING_LAMP_RED_PIN, LOW);
-                gioSetBit(GIO_ALIGNMENT_WARNING_LAMP_YELLOW_PORT, GIO_ALIGNMENT_WARNING_LAMP_YELLOW_PIN, LOW);
+                //gioSetBit(GIO_ALIGNMENT_WARNING_LAMP_RED_PORT, GIO_ALIGNMENT_WARNING_LAMP_RED_PIN, LOW);
+                //gioSetBit(GIO_ALIGNMENT_WARNING_LAMP_YELLOW_PORT, GIO_ALIGNMENT_WARNING_LAMP_YELLOW_PIN, LOW);
             }
-//            EmergencyStopActive.set = 0;
-//            Calibrationbegin.set = 0;
-//            CalibrationFirstTemprorySettings.set = 0;
-//            CalibrationSecondTemprorySettings.set = 0;
-//            CalibrationFinalSettings.set = 0;
-//            CalibrationCancel.set = 0;
-//            CalibrationFailure.set = 0;
-//
-//            FifthWheelAnglePositioneLeft.set = 0;
-//            FifthWheelAnglePositioneRight.set = 0;
-//            VehicleInRoute.set = 0;
-//
-//            AutomaticAligmentDone.set = 0;
-//            ISSSingalActive.set = 0;
-//            FrontSensorInoperative.set = 0;
-//            BackSensorInoperative.set = 0;
-//
-//            EmergencyStopActive.set = 0;
-            break;
 
+            break;
+/************************************************************************Right_valf bottun process***/
         case 1:
             if(emergency_stop == false && right_aligment == true){
                 if(full_Automatic_Set_Aligment){
@@ -1021,7 +1112,7 @@ void fullAutomaticAligmentCommandsCheck(){
                 }
             }
             break;
-
+/************************************************************************left_valf bottun process***/
         case 2:
             if(emergency_stop == false && left_aligment == true){
                 if(full_Automatic_Set_Aligment){
@@ -1040,7 +1131,7 @@ void fullAutomaticAligmentCommandsCheck(){
             }
 
             break;
-
+/***********************************************************************Calibrration Auto process***/
         case 4:
             if(emergency_stop == false && auto_aligment == true){
                 if(full_Automatic_Set_Aligment){
@@ -1060,7 +1151,7 @@ void fullAutomaticAligmentCommandsCheck(){
                 }
             }
             break;
-
+/***************************************************************************Calibration Set process***/
         case 8:
             if(emergency_stop == false){
                 full_Automatic_Set_Aligment = true;
@@ -1069,13 +1160,65 @@ void fullAutomaticAligmentCommandsCheck(){
 
             }
             break;
-
+/****************************************************************Set and Auto at same time process***/
         case 12:
             if(emergency_stop == false){
                 if(aligment_set_level == 2){
                     full_Automatic_Set_Aligment = false;
                     printf("saved\n");
-                    printf("saved\n");
+
+//                    CamelneckHomeTemporary = 1022;
+//                    CamelneckRightAngleTemporary = 1000;
+//                    CamelneckLeftAngleTemporary  = 1001;
+//                    FifthWheelHomeTemporary      = 1002;
+//                    FifthWheelRightAngleTemporary= 1018;
+//                    FifthWheelLeftAngleTemporary = 1017;
+//                    CamelneckNumberTemporary     = 10.56;
+//                    FifthWheelNumberTemporary    = 10.30;
+//
+//                    EepromData[0]  = CamelneckHomeTemporary >> 8;
+//                    EepromData[1]  = CamelneckHomeTemporary & 0x00FF;
+//
+//                    EepromData[2]  = CamelneckRightAngleTemporary >> 8;
+//                    EepromData[3]  = CamelneckRightAngleTemporary & 0x00FF;
+//
+//                    EepromData[4]  = CamelneckLeftAngleTemporary >> 8;
+//                    EepromData[5]  = CamelneckLeftAngleTemporary & 0x00FF;
+//
+//                    EepromData[6]  = FifthWheelHomeTemporary >> 8;
+//                    EepromData[7]  = FifthWheelHomeTemporary & 0x00FF;
+//
+//                    EepromData[8]  = FifthWheelRightAngleTemporary >> 8;
+//                    EepromData[9]  = FifthWheelRightAngleTemporary & 0x00FF;
+//
+//                    EepromData[10] = FifthWheelLeftAngleTemporary >> 8;
+//                    EepromData[11] = FifthWheelLeftAngleTemporary & 0x00FF;
+//
+//                    CamelneckNumberTemporary =(uint16)(CamelneckNumberTemporary*100);
+//                    EepromData[12] = (uint16)CamelneckNumberTemporary >> 8;
+//                    EepromData[13] = (uint16)CamelneckNumberTemporary & 0x00FF;
+//
+//                    FifthWheelNumberTemporary = FifthWheelNumberTemporary*100;
+//                    EepromData[14] = (uint16)FifthWheelNumberTemporary >> 8;
+//                    EepromData[15] = (uint16)FifthWheelNumberTemporary & 0x00FF;
+                    printf(" eeprom saved\n");
+
+
+                    //epromWrite(0x1, EepromData);
+                    eepromRead(0x1, read_data);
+
+                    //use it for reading
+                    CamelneckHomeTemporary      = (read_data[0] << 8)|read_data[1];
+                    CamelneckRightAngleTemporary= (read_data[2] << 8)|read_data[3];
+                    CamelneckLeftAngleTemporary = (read_data[4] << 8)|read_data[5];
+                    FifthWheelHomeTemporary     = (read_data[6] << 8)|read_data[7];
+                    FifthWheelRightAngleTemporary  = (read_data[8] << 8)|read_data[9];
+                    FifthWheelLeftAngleTemporary   = (read_data[10] << 8)|read_data[11];
+                    CamelneckNumberTemporary  = (read_data[12] << 8)|read_data[13];
+                    CamelneckNumberTemporary  = CamelneckNumberTemporary/100;
+                    FifthWheelNumberTemporary = (read_data[14] << 8)|read_data[15];
+                    FifthWheelNumberTemporary = FifthWheelNumberTemporary/100;
+
                     aligment_set_level = 0;
                     printf("yellow and red lamp off\n");
                     gioSetBit(GIO_ALIGNMENT_WARNING_LAMP_RED_PORT,GIO_ALIGNMENT_WARNING_LAMP_YELLOW_PIN ,LOW);//red
@@ -1087,7 +1230,7 @@ void fullAutomaticAligmentCommandsCheck(){
 
             }
             break;
-
+/***********************************************************************emergency_stop process***/
         case 16:
             emergency_stop = true;
             Calibrationbegin.set = 0;
@@ -1108,7 +1251,7 @@ void fullAutomaticAligmentCommandsCheck(){
             aligment_set_level = 0;
             EmergencyStopActive.set = DELAY_250MS;
             break;
-
+/***********************************************************************Others process***/
         default:
             gioSetBit(GIO_ALIGNMENT_VALF_RIGHT_PORT, GIO_ALIGNMENT_VALF_RIGHT_PIN, LOW);
             gioSetBit(GIO_ALIGNMENT_VALF_LEFT_PORT, GIO_ALIGNMENT_VALF_LEFT_PIN, LOW);
@@ -1119,7 +1262,6 @@ void fullAutomaticAligmentCommandsCheck(){
             CalibrationSecondTemprorySettings.set = 0;
             CalibrationFinalSettings.set = 0;
             CalibrationCancel.set = 0;
-            CalibrationFailure.set = 0;
 
             FifthWheelAnglePositioneLeft.set = 0;
             FifthWheelAnglePositioneRight.set = 0;
@@ -1135,10 +1277,11 @@ void fullAutomaticAligmentCommandsCheck(){
     }
 }
 
+/*-----------------------------------------------------------------------------------------------------------------------------------------*/
 void fullAutomaticControlLeds(){
     if(tick){
         tick=false;
-/***********************************************************EmergencyStopActive********************************************************************/
+/***********************************************************************EmergencyStopActive****/
         if(EmergencyStopActive.set != 0){
             if(++EmergencyStopActive.count >= EmergencyStopActive.set){
 
@@ -1160,9 +1303,9 @@ void fullAutomaticControlLeds(){
                        EmergencyStopActive.counter = 0;
                    }
                }
-           }
-       }//EmergencyStopActive
-/***********************************************************FrontSensorInoperative********************************************************************/
+           }//EmergencyStopActive
+        }//EmergencyStopActive
+/*******************************************************************FrontSensorInoperative*****/
         if(FrontSensorInoperative.set != 0){
             if(++FrontSensorInoperative.count >= FrontSensorInoperative.set){
 
@@ -1183,7 +1326,7 @@ void fullAutomaticControlLeds(){
                }
            }
        }//FrontSensorInoperative
-/***********************************************************BackSensorInoperative********************************************************************/
+/********************************************************************BackSensorInoperative*****/
         if(BackSensorInoperative.set != 0){
             if(++BackSensorInoperative.count >= BackSensorInoperative.set){
 
@@ -1204,7 +1347,7 @@ void fullAutomaticControlLeds(){
                }
            }
        }//BackSensorInoperative
-/***********************************************************Calibrationbegin********************************************************************/
+/*************************************************************************Calibrationbegin*****/
 
         if(Calibrationbegin.set != 0){
             if(++Calibrationbegin.count >= Calibrationbegin.set){
@@ -1228,8 +1371,7 @@ void fullAutomaticControlLeds(){
                }
            }
        }//Calibrationbegin
-/***********************************************************CalibrationFirstTemprorySettings********************************************************************/
-
+/***********************************************************CalibrationFirstTemprorySettings****/
         if(CalibrationFirstTemprorySettings.set != 0){
             if(++CalibrationFirstTemprorySettings.count >= CalibrationFirstTemprorySettings.set){
 
@@ -1249,8 +1391,7 @@ void fullAutomaticControlLeds(){
                }
            }
        }//CalibrationFirstTemprorySettings
-/***********************************************************CalibrationSecondTemprorySettings********************************************************************/
-
+/***********************************************************CalibrationSecondTemprorySettings****/
         if(CalibrationSecondTemprorySettings.set != 0){
             if(++CalibrationSecondTemprorySettings.count >= CalibrationSecondTemprorySettings.set){
 
@@ -1268,7 +1409,7 @@ void fullAutomaticControlLeds(){
                }
            }
        }//CalibrationSecondTemprorySettings
-/***********************************************************CalibrationFinalSettings********************************************************************/
+/*******************************************************************CalibrationFinalSettings*****/
 
         if(CalibrationFinalSettings.set != 0){
             if(++CalibrationFinalSettings.count >= CalibrationFinalSettings.set){
@@ -1295,7 +1436,7 @@ void fullAutomaticControlLeds(){
                }
            }
        }//CalibrationFinalSettings
-/***********************************************************CalibrationCancel********************************************************************/
+/*************************************************************************CalibrationCancel******/
 
         if(CalibrationCancel.set != 0){
             if(++CalibrationCancel.count >= CalibrationCancel.set){
@@ -1316,7 +1457,7 @@ void fullAutomaticControlLeds(){
                }
            }
        }//CalibrationCancel
-/***********************************************************CalibrationFailure********************************************************************/
+/************************************************************************CalibrationFailure*****/
 
         if(CalibrationFailure.set != 0){
             if(++CalibrationFailure.count >= CalibrationFailure.set){
@@ -1325,18 +1466,22 @@ void fullAutomaticControlLeds(){
                 CalibrationFailure.count = 0;
 
                if(CalibrationFailure.state){
-                   printf("yellow and red lamp on 250 x2\n");
+                   printf("yellow and red lamp on x1 for 250ms\n");
                    gioSetBit(GIO_ALIGNMENT_WARNING_LAMP_RED_PORT,GIO_ALIGNMENT_WARNING_LAMP_RED_PIN ,HIGH);//red
-                   gioSetBit(GIO_ALIGNMENT_WARNING_LAMP_RED_PORT,GIO_ALIGNMENT_WARNING_LAMP_YELLOW_PIN ,HIGH);//yellow
+                   gioSetBit(GIO_ALIGNMENT_WARNING_LAMP_YELLOW_PORT,GIO_ALIGNMENT_WARNING_LAMP_YELLOW_PIN ,HIGH);//red
                    CalibrationFailure.counter++;
                }else{
-                   printf("yellow and red lamp off 250 x2\n");
+                   printf("yellow and red lamp off x1 for 250ms\n");
                    gioSetBit(GIO_ALIGNMENT_WARNING_LAMP_RED_PORT,GIO_ALIGNMENT_WARNING_LAMP_RED_PIN ,LOW);//red
-                   gioSetBit(GIO_ALIGNMENT_WARNING_LAMP_RED_PORT,GIO_ALIGNMENT_WARNING_LAMP_YELLOW_PIN ,LOW);//yellow
+                   gioSetBit(GIO_ALIGNMENT_WARNING_LAMP_YELLOW_PORT,GIO_ALIGNMENT_WARNING_LAMP_YELLOW_PIN ,LOW);//red
+
+                   if(CalibrationFailure.counter>=1){
+                       CalibrationFailure.counter = 0;
+                   }
                }
-           }
-       }//CalibrationFailure
-/***********************************************************ISSSingalActive********************************************************************/
+           }//CalibrationFailure
+        }//CalibrationFailure
+/***************************************************************************ISSSingalActive*****/
 
         if(ISSSingalActive.set != 0){
             if(++ISSSingalActive.count >= ISSSingalActive.set){
@@ -1360,7 +1505,7 @@ void fullAutomaticControlLeds(){
                }
            }
        }//ISSSingalActive
-/***********************************************************AutomaticAligmentDone********************************************************************/
+/***********************************************************************AutomaticAligmentDone****/
 
         if(AutomaticAligmentDone.set != 0){
             if(++AutomaticAligmentDone.count >= AutomaticAligmentDone.set){
@@ -1384,7 +1529,7 @@ void fullAutomaticControlLeds(){
                }
            }
        }//AutomaticAligmentDone
-/***********************************************************AutomaticAligmentDone********************************************************************/
+/***********************************************************************AutomaticAligmentDone****/
 
         if(VehicleInRoute.set != 0){
             if(++VehicleInRoute.count >= VehicleInRoute.set){
@@ -1408,7 +1553,7 @@ void fullAutomaticControlLeds(){
     }//tick
 
 }
-
+/*-----------------------------------------------------------------------------------------------------------------------------------------*/
 void semiAutomaticControlLeds( void ){
 
     if( AutoHizalamaBitti.set !=0 ){
@@ -1491,6 +1636,7 @@ void semiAutomaticCommandsCheck(){
 
 void fullAutomaticCommandCheck(){
     if( full_Automatic_AutoAlignment == false ){ // Otomatik Hizalama
+        fullAutomaticPumpCheck();
         fullAutomaticAligmentCommandsCheck();
         }
 }
@@ -1672,111 +1818,16 @@ void main(void)
     Calibrationbegin.set = 0;
     CalibrationFirstTemprorySettings.set = 0;
     CalibrationSecondTemprorySettings.set = 0;
-    CalibrationSecondTemprorySettings.set = 0;
+    CalibrationFinalSettings.set = 0;
     EmergencyStopActive.set =0;
     CalibrationFailure.set = DELAY_250MS;
-
+//
 //    /*******************************************************/
 //    //eeprom
 //    /*******************************************************/
-//    unsigned int BlockNumber;
-//    unsigned int BlockOffset, Length;
-//    unsigned char *Read_Ptr=read_data;
-//
-//    //unsigned int loop;
-//
-//    /* Initialize RAM array.*/
-//    //for(loop=0;loop<100;loop++)SpecialRamBlock[loop] = loop;
-//    SpecialRamBlock[0]= 100;
-//    SpecialRamBlock[1]= 100;
-//    SpecialRamBlock[2]= 100;
-//    SpecialRamBlock[3]= 50 ;
-//    SpecialRamBlock[4]= 100;
-//    SpecialRamBlock[5]= 100;
-//    SpecialRamBlock[6]= 100;
-//    SpecialRamBlock[7]= 50;
-//    SpecialRamBlock[8]= 100;
-//    SpecialRamBlock[9]= 200;
-//    SpecialRamBlock[10]= 200;
-//    SpecialRamBlock[11]= 50;
-//    SpecialRamBlock[12]= 200;
-//    SpecialRamBlock[13]= 50;
-//    SpecialRamBlock[14]= 200;
-//    SpecialRamBlock[15]= 50;
-//
-//    TI_Fee_Init();
-//    do
-//    {
-//        TI_Fee_MainFunction();
-//        delay();
-//        Status=TI_Fee_GetStatus(0 );
-//    }
-//    while(Status!= IDLE);
-////    TI_Fee_EraseImmediateBlock(0x1);
-////        do
-////        {
-////            TI_Fee_MainFunction();
-////            delay();
-////            Status=TI_Fee_GetStatus(0 );
-////        }
-////        while(Status!= IDLE);
-//  TI_Fee_Format(0xA5A5A5A5U);
-//    do
-//    {
-//        TI_Fee_MainFunction();
-//        delay();
-//        Status=TI_Fee_GetStatus(0 );
-//    }
-//    while(Status!= IDLE);
-//    BlockOffset = 0;
-//    Length = 0xFFFF;
 //
 //
-//    TI_Fee_Init();
-//    do
-//    {
-//        TI_Fee_MainFunction();
-//        delay();
-//        Status=TI_Fee_GetStatus(0 );
-//    }
-//
-//
-//    while(Status!= IDLE);
-//    BlockNumber=0x1;
-//    TI_Fee_WriteAsync(BlockNumber, &SpecialRamBlock[0]);
-//    do
-//    {
-//        TI_Fee_MainFunction();
-//        delay();
-//        Status=TI_Fee_GetStatus(0);
-//    }
-//    while(Status!=IDLE);
-//
-//
-//    /* Read the block with unknown length */
-//     BlockOffset = 0;
-//     Length = 0xFFFF;
-//     oResult=TI_Fee_Read(0x1,BlockOffset,Read_Ptr,Length);
-//     do
-//     {
-//         TI_Fee_MainFunction();
-//         delay();
-//         Status=TI_Fee_GetStatus(0);
-//     }
-//    while(Status!=IDLE);
 
-    /* Invalidate a written block  */
-//    TI_Fee_InvalidateBlock(BlockNumber);
-//    do
-//    {
-//        TI_Fee_MainFunction();
-//        delay();
-//        Status=TI_Fee_GetStatus(0);
-//    }
-//    while(Status!=IDLE);
-
-    /* Format bank 7 */
-    //TI_Fee_Format(0xA5A5A5A5U);
 
      /***********************************************************/
 
@@ -1807,7 +1858,7 @@ void main(void)
  /******************************************************************************fullAutomaticmode*****************************************************/
 
 
-       // if( Fullautomaticmode ){
+        if( Fullautomaticmode ){
             if(systemActiveCheck()&& ISSCheck()!=true){
 
                 if(full_Automatic_AutoAlignment){
@@ -1821,35 +1872,35 @@ void main(void)
                 fullAutomaticStandBymode();
             }//systemActiveCheck
 
-       // }//Fullautomaticmode
+        }//Fullautomaticmode
 
  /************************************************************************************************************************************/
  /******************************************************************************Semiautomaticmode*****************************************************/
 
-//        if(Semiautomaticmode){
-//            can_tx_data[3] = 0;
-//            canTransmit(canREG1, canMESSAGE_BOX4, can_tx_data);//id = 4
-//            if(systemActiveCheck()&& ISSCheck()!=true){
-//
-//                gioSetBit(GIO_OIL_PUMP_PORT, GIO_OIL_PUMP_PIN, HIGH);
-//                can_tx_data[2] = 255;
-//                canTransmit(canREG1, canMESSAGE_BOX4, can_tx_data);//id = 4
-//
-//                if( AutoHizalama ){
-//                    semiAutomaticAutoHizalamaProcess();
-//                }
-//
-//                if(tick){
-//                    tick = false;
-//                    semiAutomaticCommandsCheck();
-//                    semiAutomaticControlLeds();
-//                }
-//
-//            }else{
-//                semiAutomaticStandByMode();
-//            }
-//
-//        }//Semiautomaticmode
+        if(Semiautomaticmode){
+            can_tx_data[3] = 0;
+            canTransmit(canREG1, canMESSAGE_BOX4, can_tx_data);//id = 4
+            if(systemActiveCheck()&& ISSCheck()!=true){
+
+                gioSetBit(GIO_OIL_PUMP_PORT, GIO_OIL_PUMP_PIN, HIGH);
+                can_tx_data[2] = 255;
+                canTransmit(canREG1, canMESSAGE_BOX4, can_tx_data);//id = 4
+
+                if( AutoHizalama ){
+                    semiAutomaticAutoHizalamaProcess();
+                }
+
+                if(tick){
+                    tick = false;
+                    semiAutomaticCommandsCheck();
+                    semiAutomaticControlLeds();
+                }
+
+            }else{
+                semiAutomaticStandByMode();
+            }
+
+        }//Semiautomaticmode
 
     }//while(1)
 }//main
