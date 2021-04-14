@@ -38,7 +38,7 @@ volatile int8_t successStep   = 0;
 uint16_t rcvId[] = { 0xC28B, 0xD28B, 0xE28B, 0xF28B };
 
 uint16 global_counter;
-uint32 ADS1018Data[4];
+uint16 ADS1018Data[4];
 /*************************************************************
  * Function Definitions
 

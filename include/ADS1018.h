@@ -47,7 +47,7 @@ spiDAT1_t dataconfig2_t;
 #define ADS_AIN3      0xF28B
 
 extern uint16 global_counter;
-extern uint32 ADS1018Data[4];
+extern uint16 ADS1018Data[4];
 
 enum substeps{
 
