@@ -62,6 +62,8 @@ source/sys_main.obj: C:/Users/inovar/workspace_v9/Lowbadtest/include/PINOUT.h
 source/sys_main.obj: C:/Users/inovar/workspace_v9/Lowbadtest/include/LOWBAD_IO_PIN.h
 source/sys_main.obj: C:/Users/inovar/workspace_v9/Lowbadtest/include/MCP23S17.h
 source/sys_main.obj: C:/ti/ccs930/ccs/tools/compiler/ti-cgt-arm_18.12.4.LTS/include/stdlib.h
+source/sys_main.obj: C:/Users/inovar/workspace_v9/Lowbadtest/include/ADS1018.h
+source/sys_main.obj: C:/ti/ccs930/ccs/tools/compiler/ti-cgt-arm_18.12.4.LTS/include/stdlib.h
 source/sys_main.obj: C:/Users/inovar/workspace_v9/Lowbadtest/include/PCA2129.h
 source/sys_main.obj: C:/ti/ccs930/ccs/tools/compiler/ti-cgt-arm_18.12.4.LTS/include/stdlib.h
 source/sys_main.obj: C:/Users/inovar/workspace_v9/Lowbadtest/include/SST25PF040C.h
@@ -128,6 +130,8 @@ C:/Users/inovar/workspace_v9/Lowbadtest/include/Device_types.h:
 C:/Users/inovar/workspace_v9/Lowbadtest/include/PINOUT.h: 
 C:/Users/inovar/workspace_v9/Lowbadtest/include/LOWBAD_IO_PIN.h: 
 C:/Users/inovar/workspace_v9/Lowbadtest/include/MCP23S17.h: 
+C:/ti/ccs930/ccs/tools/compiler/ti-cgt-arm_18.12.4.LTS/include/stdlib.h: 
+C:/Users/inovar/workspace_v9/Lowbadtest/include/ADS1018.h: 
 C:/ti/ccs930/ccs/tools/compiler/ti-cgt-arm_18.12.4.LTS/include/stdlib.h: 
 C:/Users/inovar/workspace_v9/Lowbadtest/include/PCA2129.h: 
 C:/ti/ccs930/ccs/tools/compiler/ti-cgt-arm_18.12.4.LTS/include/stdlib.h: 

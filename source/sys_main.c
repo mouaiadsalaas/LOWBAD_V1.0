@@ -23,7 +23,7 @@
 #include "PINOUT.h"
 #include "LOWBAD_IO_PIN.h"
 #include "MCP23S17.h"
-//#include "ADS1018.h"
+#include "ADS1018.h"
 #include "PCA2129.h"
 #include "SST25PF040C.h"
 //NOTES:
@@ -49,92 +49,66 @@
 uint16 myinput[16];
 uint8_t result;
 
-//ADS1018
-/**************************************************************
- * Global Definitions
- **************************************************************/
-#define ADS_AIN0      0xC28B
-#define ADS_AIN1      0xD28B
-#define ADS_AIN2      0xE28B
-#define ADS_AIN3      0xF28B
-spiDAT1_t dataconfig2_t;
-uint16_t global_counter=0;
-
-volatile uint32_t beginTime;
-volatile uint32_t timeOut;
-
-uint32_t step=0;
-uint32_t functiontodo =0;
-volatile int8_t subStep  = 0;
-volatile int8_t failStep = 0;
-
-volatile int8_t currentStep   = 0;
-volatile int8_t successStep   = 0;
 
 
 
-enum substeps{
+//SEMIAUTOMATIC
+uint8 PumpSlaveBtn = 0;
 
-    STEP_0 = 0,
-    STEP_1,
-    STEP_2,
-    STEP_3,
-    STEP_WAIT,
-    STEP_GPRS_CONNECTED
-};
+bool ISSActiveState      = false;
+bool AutoHizalamaState   = false;
+bool AlignmentRightState = false;
+bool AlignmentLeftState  = false;
+bool AlignmentAutoState  = false;
+
+bool AutoHizalama   = false;
+bool AcilStopON     = false;
+bool SysActive      = false;
+bool AlignmentRight = false;
+bool AlignmentLeft  = false;
+bool AlignmentAuto  = false;
+bool fullPumpState  = false;
 
 
-uint16_t rcvId[] = { 0xC28B, 0xD28B, 0xE28B, 0xF28B };
-uint16_t ADS1018Data[4];
+//FULLAUTOMATIC
 uint16_t Amount;
 uint16_t Average;
 uint16_t adc_samplecounter;
 
-uint8 PumpSlaveBtn = 0;
-bool fullPumpState = false;
-
-bool AcilStopON = false;
-bool ISSAktive = true;
-bool SysActive = false;
-bool ISSActiveState = false;
-
-bool AutoHizalamaState = false;
-bool AutoHizalama = false;
-
-bool AlignmentRight = false;
-bool AlignmentLeft = false;
-bool AlignmentAuto = false;
-
-bool AlignmentRightState = false;
-bool AlignmentLeftState = false;
-bool AlignmentAutoState = false;
-
 uint8_t aligment_buf;
-bool SetMode = false;
+bool SetMode  = false;
 bool StopMode = false;
+bool ISS      = false;
+
 bool emergency_stop = false;
-bool ISS = false;
-bool auto_aligment =false;
-bool left_aligment =false;
-bool right_aligment =false;
-bool set_aligment =false;
+bool auto_aligment  = false;
+bool left_aligment  = false;
+bool right_aligment = false;
+bool set_aligment   = false;
+bool StopModeState  = false;
 
-bool SetModeState = false;
-bool StopModeState = false;
-bool StopModeStateTwo = false;
+bool full_Automatic_AutoAlignment = false;
+bool full_Automatic_Set_Aligment  = false;
 
-bool Caliberundefined = false;
+bool Caliberundefined    = false;
 bool SystemActiveCaliber = true;
 
-int CamelneckHomeTemporary;
-int CamelneckRightAngleTemporary;
-int CamelneckLeftAngleTemporary;
-float CamelneckNumberTemporary;
-int CamelneckNumberTemporaryinteger;
+bool tick  = false;
+bool tick2 = false;
 
+bool Fullautomaticmode = false;
+bool Semiautomaticmode = false;
+
+int CamelneckHomeTemporary;
 int FifthWheelHomeTemporary;
+
+int CamelneckRightAngleTemporary;
 int FifthWheelRightAngleTemporary;
+
+int CamelneckLeftAngleTemporary;
 int FifthWheelLeftAngleTemporary;
+
+float CamelneckNumberTemporary;
 float FifthWheelNumberTemporary;
 
 int FifthWheelNumberValue =0;
@@ -151,7 +125,6 @@ typedef struct leds{
 
 Led Fullautomaticled;
 Led Semiautomaticled;
-Led CaliberAcilStopLed;
 Led CaliberStartLed;
 Led CaliberStopLed;
 Led CaliberBirinciKayitLed;
@@ -164,6 +137,7 @@ Led AutoHizalamaBitti;
 Led CaliberBozuk;
 Led OnSensorAriza;
 Led ArkaSensorAriza;
+Led CaliberAcilStopLed;
 
 typedef struct timer{
     uint16_t set;
@@ -171,7 +145,7 @@ typedef struct timer{
     bool state;
     uint16_t counter;
 }Timers;
-
+Timers ModeSelectDelay;
 Timers Calibrationbegin;
 Timers CalibrationFirstTemprorySettings;
 Timers CalibrationSecondTemprorySettings;
@@ -190,21 +164,6 @@ Timers BackSensorInoperative;
 
 Timers EmergencyStopActive;
 
-
-typedef struct buttons{
-
-    bool state;
-    uint8_t count;
-    uint8_t set;
-
-}Button;
-
-
-Button KalibrasyonStart;
-Button KalibrasyonStop;
-Button KalibrasyonKesinKayit;
-Button OtomatikhizalamaEx;
-
 typedef enum delays{
 
     DELAY_250MS = 25,
@@ -213,13 +172,7 @@ typedef enum delays{
 
 }Delays;
 
-bool full_Automatic_AutoAlignment = false;
-bool full_Automatic_Set_Aligment = false;
 
-bool tick=false;
-bool tick2=false;
-bool Fullautomaticmode = false;
-bool Semiautomaticmode = false;
 uint16_t AttractiveRightSensor; // Sensor 1
 uint16_t AttractiveLeftSensorAndCamelNeck; // Sensor 2
 
@@ -230,21 +183,14 @@ uint16_t canSensorData;
 uint8_t aligment_set_level = 0;
 bool PumpState = false;
 
-bool CaliberMod = true;
-bool AutoControl = true; //true ali
-//ADS1018 spi config
-
 //adc
 adcData_t adc_data[16];
-void wait(uint32 time);
-
-    uint64 ch_count=0;
-    uint32 id    =0;
-    uint64 value =0;
+uint64 ch_count=0;
+uint32 id    =0;
+uint64 value =0;
 
 //canbus
 #define  D_SIZE 8
-
 uint8  can_tx_data[D_SIZE];
 uint8  can_rx_data[D_SIZE] = {0};
 uint32 error = 0;
@@ -282,6 +228,7 @@ uint8 Test_Cancel;
 
 uint16_t AciSonuc ;
 uint16_t DegerSonuc ;
+int mode;
 
 void delay(void)
 {
@@ -296,100 +243,7 @@ void delay(void)
 
 uint32 checkPackets(uint8 *src_packet,uint8 *dst_packet,uint32 psize);
 
-
-void SPIPCA2129Init(){
-    dataconfig3_t.CS_HOLD = TRUE;
-    dataconfig3_t.WDEL    = TRUE;
-    dataconfig3_t.DFSEL   = SPI_FMT_1;
-    dataconfig3_t.CSNR    = 0xFE;
-}
-
-void SPISST25PF040CInit(){
-    dataconfig4_t.CS_HOLD = TRUE;
-    dataconfig4_t.WDEL    = TRUE;
-    dataconfig4_t.DFSEL   = SPI_FMT_2;
-    dataconfig4_t.CSNR    = 0xFE;
-}
-/*************************************************************
- * Function Definitions
-
-**************************************************************/
-
-void setStep( int sub, int current, int success, uint32_t time, uint32_t begin ){
-    subStep = sub;
-    currentStep = current;
-    successStep = success;
-    timeOut = time;
-    beginTime = begin;
-}
-
- void Register2write(void){
-     switch (functiontodo) {
-        case 0:
-            spiTransmitData(spiREG3, &dataconfig2_t, 1, (uint16_t*)&rcvId[0]);
-            break;
-
-        case 1:
-            spiTransmitData(spiREG3, &dataconfig2_t, 1, (uint16_t*)&rcvId[1]);
-            break;
-
-        case 2:
-            spiTransmitData(spiREG3, &dataconfig2_t, 1, (uint16_t*)&rcvId[2]);
-            break;
-
-        case 3:
-            spiTransmitData(spiREG3, &dataconfig2_t, 1, (uint16_t*)&rcvId[3]);
-            break;
-
-        default:
-            break;
-    }
-
- }
-
-void ADS1018Adcread( void ){
-
-    switch( subStep ){
-
-        case STEP_0:
-            setStep(STEP_WAIT, STEP_0, STEP_1, 1, global_counter);
-            functiontodo = 0;
-            break;
-
-        case STEP_1:
-            setStep(STEP_WAIT, STEP_1, STEP_2, 1, global_counter);
-            functiontodo = 1;
-            break;
-
-        case STEP_2:
-           setStep(STEP_WAIT, STEP_2, STEP_3,  1, global_counter);
-           functiontodo = 2;
-           break;
-
-        case STEP_3:
-            setStep(STEP_WAIT, STEP_3, STEP_GPRS_CONNECTED, 1, global_counter);
-            functiontodo = 3;
-            break;
-
-
-        case STEP_GPRS_CONNECTED:
-            subStep = STEP_0;
-            break;
-
-
-        case STEP_WAIT:
-
-            if( global_counter - beginTime > timeOut ){
-                    spiReceiveData(spiREG3,  &dataconfig2_t, 1, (uint16_t*)&ADS1018Data[currentStep]);
-                    spiReceiveData(spiREG3,  &dataconfig2_t, 1, (uint16_t*)&ADS1018Data[currentStep]);
-                    subStep = successStep;
-            }else{
-                    Register2write();
-            }
-
-    }
-}
-
+/*--------------------------------------------------------------------------RTIInit---------------------------------------------------------*/
 void RTIInit(){
     rtiInit();
 
@@ -402,7 +256,7 @@ void RTIInit(){
     //    rtiStartCounter(rtiCOUNTER_BLOCK0);
 
 }
-
+/*------------------------------------------------------------------------HardwareInit------------------------------------------------------*/
 void HardwareInit(){
     hetInit();
     gioInit();
@@ -411,7 +265,7 @@ void HardwareInit(){
     canInit();
     RTIInit();
 }
-
+/*------------------------------------------------------------------------SPIMCPInit--------------------------------------------------------*/
 void SPIMCPInit(){
     dataconfig1_t.CS_HOLD = TRUE;
     dataconfig1_t.WDEL    = FALSE;
@@ -420,21 +274,35 @@ void SPIMCPInit(){
 
     _enable_IRQ();
 }
-
+/*-----------------------------------------------------------------------SPIADS1018Init------------------------------------------------------*/
 void SPIADS1018Init(){
     dataconfig2_t.CS_HOLD = TRUE;
     dataconfig2_t.WDEL    = TRUE;
     dataconfig2_t.DFSEL   = SPI_FMT_3;//8 bit  fmt2
     dataconfig2_t.CSNR    = 0xFE;
 }
-
+/*-----------------------------------------------------------------------SPIPCA2129Init------------------------------------------------------*/
+void SPIPCA2129Init(){
+    dataconfig3_t.CS_HOLD = TRUE;
+    dataconfig3_t.WDEL    = TRUE;
+    dataconfig3_t.DFSEL   = SPI_FMT_1;
+    dataconfig3_t.CSNR    = 0xFE;
+}
+/*----------------------------------------------------------------------SPISST25PF040CInit---------------------------------------------------*/
+void SPISST25PF040CInit(){
+    dataconfig4_t.CS_HOLD = TRUE;
+    dataconfig4_t.WDEL    = TRUE;
+    dataconfig4_t.DFSEL   = SPI_FMT_2;
+    dataconfig4_t.CSNR    = 0xFE;
+}
+/*-----------------------------------------------------------------------SPIdevicesinit------------------------------------------------------*/
 void SPIdevicesinit(){
     SPIMCPInit();
     SPIADS1018Init();
     SPIPCA2129Init();
     SPISST25PF040CInit();
 }
-
+/*-------------------------------------------------------------------------OutputInit--------------------------------------------------------*/
 void OutputInit(){
     //4 channel POWER SWITCHE(LEFT) LOW
     gioSetBit(VNQ5050KTRE_LEFT_INT1_PORT, VNQ5050KTRE_LEFT_INT1_PIN, LOW);
@@ -464,7 +332,7 @@ void OutputInit(){
     //1 channel POWER SWITCHE(BOTTOM CENTER) LOW
     gioSetBit(VN5T006ASPTRE_BOTTOM_INT1_PORT, VN5T006ASPTRE_BOTTOM_INT1_PIN, LOW);
 }
-
+/*----------------------------------------------------------------Left4PowerSwitchStatusGet--------------------------------------------------*/
 void Left4PowerSwitchStatusGet(){
     //4 channel POWER SWITCHE(LEFT) STATUS
     VNQ5050KTRE_LEFT_1STAT1_VAL = adc_data[11].value;
@@ -472,7 +340,7 @@ void Left4PowerSwitchStatusGet(){
     VNQ5050KTRE_LEFT_1STAT3_VAL = adc_data[2].value;
     VNQ5050KTRE_LEFT_1STAT4_VAL = adc_data[10].value;
 }
-
+/*----------------------------------------------------------------Right4PowerSwitchStatusGet-------------------------------------------------*/
 void Right4PowerSwitchStatusGet(){
     //4 channel POWER SWITCHE(RIGHT) STATUS
     VNQ5050KTRE_RIGHT_2STAT1_VAL = adc_data[8].value;
@@ -480,22 +348,25 @@ void Right4PowerSwitchStatusGet(){
     VNQ5050KTRE_RIGHT_2STAT3_VAL = adc_data[5].value;
     VNQ5050KTRE_RIGHT_2STAT4_VAL = adc_data[4].value;
 }
-
+/*----------------------------------------------------------------Left2PowerSwitchStatusGet--------------------------------------------------*/
 void Left2PowerSwitchStatusGet(){
     //2 channel POWER SWITCHE(LEFT)
     VNQ5050KTRE_LEFT_1CS1_VAL = adc_data[9].value;
     VNQ5050KTRE_LEFT_1CS2_VAL = adc_data[1].value;
 }
+/*----------------------------------------------------------------Right2PowerSwitchStatusGet-------------------------------------------------*/
 
 void Right2PowerSwitchStatusGet(){
     //2 channel POWER SWITCHE(RIGHT)
     VNQ5050KTRE_RIGHT_2CS1_VAL = adc_data[0].value;
     VNQ5050KTRE_RIGHT_2CS2_VAL = adc_data[7].value;
 }
+/*----------------------------------------------------------------Bottom1PowerSwitchStatusGet-------------------------------------------------*/
 
 void Bottom1PowerSwitchStatusGet(){
     VN5T006ASPTRE_BOTTOM_CS1_VAL = adc_data[15].value;
 }
+/*----------------------------------------------------------------AllPowerSwitchSTatusGet-----------------------------------------------------*/
 
 void AllPowerSwitchSTatusGet(){
     Left4PowerSwitchStatusGet();
@@ -503,30 +374,8 @@ void AllPowerSwitchSTatusGet(){
     Left2PowerSwitchStatusGet();
     Right2PowerSwitchStatusGet();
 }
+/*-------------------------------------------------------------------CanYellowHighLow--------------------------------------------------------*/
 
-void CanYellowHighLow ( bool state ){
-
-    if( state ){
-        gioSetBit(GIO_ALIGNMENT_WARNING_LAMP_RED_PORT,GIO_ALIGNMENT_WARNING_LAMP_RED_PIN ,HIGH);//yellow
-        can_tx_data[0] = (255) & 0xFF;
-
-    }else{
-        gioSetBit(GIO_ALIGNMENT_WARNING_LAMP_RED_PORT,GIO_ALIGNMENT_WARNING_LAMP_RED_PIN ,LOW);//yellow
-        can_tx_data[0] = (0) & 0xFF;
-
-    }
-}
-
-void CanRedHighLow ( bool state ){
-
-    if( state ){
-        gioSetBit(GIO_ALIGNMENT_WARNING_LAMP_RED_PORT,GIO_ALIGNMENT_WARNING_LAMP_RED_PIN ,HIGH);
-        can_tx_data[1] = (255) & 0xFF;
-    }else{
-        gioSetBit(GIO_ALIGNMENT_WARNING_LAMP_RED_PORT,GIO_ALIGNMENT_WARNING_LAMP_RED_PIN ,LOW);
-        can_tx_data[1] = (0) & 0xFF;
-    }
-}
 
 void MCUADCread(){
     adcStartConversion(adcREG1,adcGROUP1);
@@ -656,6 +505,30 @@ void eepromRead(unsigned int Block_NO,uint8 eeprom_Data_RX[16]){
 
         /* Format bank 7 */
         //TI_Fee_Format(0xA5A5A5A5U);
+}
+
+void CanYellowHighLow ( bool state ){
+
+    if( state ){
+        gioSetBit(GIO_ALIGNMENT_WARNING_LAMP_RED_PORT,GIO_ALIGNMENT_WARNING_LAMP_RED_PIN ,HIGH);//yellow
+        can_tx_data[0] = (255) & 0xFF;
+
+    }else{
+        gioSetBit(GIO_ALIGNMENT_WARNING_LAMP_RED_PORT,GIO_ALIGNMENT_WARNING_LAMP_RED_PIN ,LOW);//yellow
+        can_tx_data[0] = (0) & 0xFF;
+
+    }
+}
+
+void CanRedHighLow ( bool state ){
+
+    if( state ){
+        gioSetBit(GIO_ALIGNMENT_WARNING_LAMP_RED_PORT,GIO_ALIGNMENT_WARNING_LAMP_RED_PIN ,HIGH);
+        can_tx_data[1] = (255) & 0xFF;
+    }else{
+        gioSetBit(GIO_ALIGNMENT_WARNING_LAMP_RED_PORT,GIO_ALIGNMENT_WARNING_LAMP_RED_PIN ,LOW);
+        can_tx_data[1] = (0) & 0xFF;
+    }
 }
 void canMessageCheck(){
 
@@ -1556,6 +1429,8 @@ void fullAutomaticControlLeds(){
 /*-----------------------------------------------------------------------------------------------------------------------------------------*/
 void semiAutomaticControlLeds( void ){
 
+
+
     if( AutoHizalamaBitti.set !=0 ){
         if( ++AutoHizalamaBitti.count >= AutoHizalamaBitti.set ){
 
@@ -1662,7 +1537,7 @@ void modeWarning(){
                 }else{
                     Fullautomaticmode = false;
                     Semiautomaticmode = true;
-
+                    CalibrationFailure.set = DELAY_250MS;
                     Semiautomaticled.state =0;
                     Semiautomaticled.set =0;
                 }
@@ -1679,39 +1554,27 @@ void modeWarning(){
                 if( Fullautomaticled.counter < 2){
                     if( Fullautomaticled.state){
 
-                        gioSetBit(GIO_ALIGNMENT_WARNING_LAMP_RED_PORT,GIO_ALIGNMENT_WARNING_LAMP_RED_PIN ,HIGH);//red
+                        gioSetBit(GIO_ALIGNMENT_WARNING_LAMP_YELLOW_PORT,GIO_ALIGNMENT_WARNING_LAMP_YELLOW_PIN ,HIGH);//red
                     }else{
-                        gioSetBit(GIO_ALIGNMENT_WARNING_LAMP_RED_PORT,GIO_ALIGNMENT_WARNING_LAMP_RED_PIN ,LOW);//red
+                        gioSetBit(GIO_ALIGNMENT_WARNING_LAMP_YELLOW_PORT,GIO_ALIGNMENT_WARNING_LAMP_YELLOW_PIN ,LOW);//red
                         Fullautomaticled.counter++;
                     }
                     canTransmit(canREG1, canMESSAGE_BOX4, can_tx_data);//id = 4
                 }else{
                     Fullautomaticmode = true;
                     Semiautomaticmode = false;
-                    KalibrasyonStart.set = 55;
-
-                    KalibrasyonStop.set = 55;
-                    KalibrasyonKesinKayit.set = 50;
-
-                    CaliberStartLed.set = 0;
-                    CaliberStopLed.set = 0;
-                    CaliberBirinciKayitLed.set =0;
-                    CaliberikinciKayitLed.set =0;
-                    CaliberKesinKayitLed.set =0;
-                    CaliberAcilStopLed.set =0;
-
-
-                    TekerlekSagLed.set =0;
-                    TekerlekSolLed.set =0;
-                    TekerlekDuzLed.set =0;
-                    CaliberBozuk.set =0;
-                    SystemActiveCaliber = true;
-
-                    AutoHizalamaBitti.set =0;
-                    AutoHizalamaBitti.counter =0;
 
                     Fullautomaticled.state =0;
                     Fullautomaticled.set =0;
+                    Calibrationbegin.set = 0;
+                    CalibrationFirstTemprorySettings.set = 0;
+                    CalibrationSecondTemprorySettings.set = 0;
+                    CalibrationFinalSettings.set = 0;
+                    EmergencyStopActive.set =0;
+                    CalibrationFailure.set = DELAY_250MS;
+
+
+
                 }
             }
         }//fullautonmaticwarning
@@ -1754,7 +1617,6 @@ void semiAutomaticAutoHizalamaProcess(){
 
 void semiAutomaticStandByMode(){
 
-    ISSAktive = true;
     AcilStopON = true;
 
     gioSetBit(GIO_ALIGNMENT_VALF_LEFT_PORT, GIO_ALIGNMENT_VALF_LEFT_PIN,LOW);
@@ -1769,29 +1631,30 @@ void semiAutomaticStandByMode(){
 }
 
 void fullAutomaticStandBymode(){
-//    CaliberStartLed.set = 0;
-//    CaliberStopLed.set = 0;
-//    CaliberBirinciKayitLed.set =0;
-//    CaliberikinciKayitLed.set =0;
-//    CaliberKesinKayitLed.set =0;
-//    CaliberAcilStopLed.set =0;
-//    CaliberBozuk.set =0;
-//
-//    TekerlekSagLed.set =0;
-//    TekerlekSolLed.set =0;
-//    TekerlekDuzLed.set =0;
-//    CaliberBozuk.set =0;
-//
-//    BigAngle = true;
-//    SmallAngle = true;
-//    AutoHizalama = false;
-//    SystemActiveCaliber = true;
-//
-//    gioSetBit(GIO_ALIGNMENT_VALF_LEFT_PORT, GIO_ALIGNMENT_VALF_LEFT_PIN, LOW);
-//    gioSetBit(GIO_ALIGNMENT_VALF_RIGHT_PORT, GIO_ALIGNMENT_VALF_RIGHT_PIN, LOW);
-//    gioSetBit(GIO_PUMP_PORT, GIO_PUMP_PIN,LOW);
-//    CanYellowHighLow(false);
-//    CanRedHighLow(false);
+    ModeSelectDelay.set = 0;
+    Calibrationbegin.set = 0;
+    CalibrationFirstTemprorySettings.set = 0;
+    CalibrationSecondTemprorySettings.set = 0;
+    CalibrationFinalSettings.set = 0;
+    CalibrationCancel.set = 0;
+    CalibrationFailure.set = 0;
+
+    FifthWheelAnglePositioneLeft.set = 0;
+    FifthWheelAnglePositioneRight.set = 0;
+    VehicleInRoute.set = 0;
+
+    AutomaticAligmentDone.set = 0;
+    ISSSingalActive.set = 0;
+    FrontSensorInoperative.set = 0;
+    BackSensorInoperative.set = 0;
+
+    EmergencyStopActive.set = 0;
+    full_Automatic_AutoAlignment = false;
+    gioSetBit(GIO_ALIGNMENT_VALF_LEFT_PORT, GIO_ALIGNMENT_VALF_LEFT_PIN, LOW);
+    gioSetBit(GIO_ALIGNMENT_VALF_RIGHT_PORT, GIO_ALIGNMENT_VALF_RIGHT_PIN, LOW);
+    gioSetBit(GIO_PUMP_PORT, GIO_PUMP_PIN,LOW);
+    CanYellowHighLow(false);
+    CanRedHighLow(false);
 }
 
 void fullAutomaticAutoAlignmentProcess(){
@@ -1801,35 +1664,31 @@ void fullAutomaticAutoAlignmentProcess(){
 
 }
 ///ADS not working check global counter maybe its timer is not working
+
+void delaymode(){
+    if( ModeSelectDelay.set !=0 ){
+        for(int i = 0; i <= 10000000; i++){
+        }
+        ModeSelectDelay.set = 0;
+    }//AutoHizalamaBitti.set
+}
 void main(void)
 {
     HardwareInit();
     SPIdevicesinit();
     InputInit();
     OutputInit();
-
-    if( MCP_pinRead(GIO_FUNCTION_SELECT_PIN) ){
+    ModeSelectDelay.set =DELAY_250MS;
+    delaymode();
+    mode = MCP_pinRead(GIO_FUNCTION_SELECT_PIN);
+    if(mode>0){
         Fullautomaticled.set = DELAY_250MS;
         //fullAutomatic = true;
     }else{
         Semiautomaticled.set = DELAY_250MS;
         //semiAutomatic = false;
     }
-    Calibrationbegin.set = 0;
-    CalibrationFirstTemprorySettings.set = 0;
-    CalibrationSecondTemprorySettings.set = 0;
-    CalibrationFinalSettings.set = 0;
-    EmergencyStopActive.set =0;
-    CalibrationFailure.set = DELAY_250MS;
-//
-//    /*******************************************************/
-//    //eeprom
-//    /*******************************************************/
-//
-//
 
-
-     /***********************************************************/
 
 
     while(1) /* ... continue forever */

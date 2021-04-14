@@ -26,10 +26,6 @@ source/ADS1018.obj: C:/Users/inovar/workspace_v9/Lowbadtest/include/sys_common.h
 source/ADS1018.obj: C:/Users/inovar/workspace_v9/Lowbadtest/include/hal_stdtypes.h
 source/ADS1018.obj: C:/Users/inovar/workspace_v9/Lowbadtest/include/reg_gio.h
 source/ADS1018.obj: C:/Users/inovar/workspace_v9/Lowbadtest/include/gio.h
-source/ADS1018.obj: C:/ti/ccs930/ccs/tools/compiler/ti-cgt-arm_18.12.4.LTS/include/signal.h
-source/ADS1018.obj: C:/ti/ccs930/ccs/tools/compiler/ti-cgt-arm_18.12.4.LTS/include/stddef.h
-source/ADS1018.obj: C:/ti/ccs930/ccs/tools/compiler/ti-cgt-arm_18.12.4.LTS/include/strings.h
-source/ADS1018.obj: C:/ti/ccs930/ccs/tools/compiler/ti-cgt-arm_18.12.4.LTS/include/stdlib.h
 
 ../source/ADS1018.c: 
 C:/Users/inovar/workspace_v9/Lowbadtest/include/ADS1018.h: 
@@ -57,7 +53,3 @@ C:/Users/inovar/workspace_v9/Lowbadtest/include/sys_common.h:
 C:/Users/inovar/workspace_v9/Lowbadtest/include/hal_stdtypes.h: 
 C:/Users/inovar/workspace_v9/Lowbadtest/include/reg_gio.h: 
 C:/Users/inovar/workspace_v9/Lowbadtest/include/gio.h: 
-C:/ti/ccs930/ccs/tools/compiler/ti-cgt-arm_18.12.4.LTS/include/signal.h: 
-C:/ti/ccs930/ccs/tools/compiler/ti-cgt-arm_18.12.4.LTS/include/stddef.h: 
-C:/ti/ccs930/ccs/tools/compiler/ti-cgt-arm_18.12.4.LTS/include/strings.h: 
-C:/ti/ccs930/ccs/tools/compiler/ti-cgt-arm_18.12.4.LTS/include/stdlib.h: 

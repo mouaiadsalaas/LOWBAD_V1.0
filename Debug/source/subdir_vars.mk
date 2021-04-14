@@ -16,6 +16,7 @@ ASM_SRCS += \
 ../source/sys_pmu.asm 
 
 C_SRCS += \
+../source/ADS1018.c \
 ../source/Device_TMS570LS07.c \
 ../source/Fapi_UserDefinedFunctions.c \
 ../source/MCP23S17.c \
@@ -56,6 +57,7 @@ C_SRCS += \
 ../source/ti_fee_writeSync.c 
 
 C_DEPS += \
+./source/ADS1018.d \
 ./source/Device_TMS570LS07.d \
 ./source/Fapi_UserDefinedFunctions.d \
 ./source/MCP23S17.d \
@@ -96,6 +98,7 @@ C_DEPS += \
 ./source/ti_fee_writeSync.d 
 
 OBJS += \
+./source/ADS1018.obj \
 ./source/Device_TMS570LS07.obj \
 ./source/Fapi_UserDefinedFunctions.obj \
 ./source/MCP23S17.obj \
@@ -148,6 +151,7 @@ ASM_DEPS += \
 ./source/sys_pmu.d 
 
 OBJS__QUOTED += \
+"source\ADS1018.obj" \
 "source\Device_TMS570LS07.obj" \
 "source\Fapi_UserDefinedFunctions.obj" \
 "source\MCP23S17.obj" \
@@ -193,6 +197,7 @@ OBJS__QUOTED += \
 "source\ti_fee_writeSync.obj" 
 
 C_DEPS__QUOTED += \
+"source\ADS1018.d" \
 "source\Device_TMS570LS07.d" \
 "source\Fapi_UserDefinedFunctions.d" \
 "source\MCP23S17.d" \
@@ -240,6 +245,7 @@ ASM_DEPS__QUOTED += \
 "source\sys_pmu.d" 
 
 C_SRCS__QUOTED += \
+"../source/ADS1018.c" \
 "../source/Device_TMS570LS07.c" \
 "../source/Fapi_UserDefinedFunctions.c" \
 "../source/MCP23S17.c" \
