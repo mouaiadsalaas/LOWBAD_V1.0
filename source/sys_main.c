@@ -1051,10 +1051,12 @@ void fullAutomaticAligmentCommandsCheck(){
     }
 }
 
-/*-----------------------------------------------------------------------------------------------------------------------------------------*/
+/*---------------------------------------------------------------------------------------------------------------------------------------------------------*/
 void ControlLeds(){
     if(tick){
         tick=false;
+/***********************************************************************incommon leds***********************************************************************/
+
 /***********************************************************************EmergencyStopActive****/
         if(EmergencyStopActive.set != 0){
             if(++EmergencyStopActive.count >= EmergencyStopActive.set){
@@ -1082,7 +1084,6 @@ void ControlLeds(){
         }//EmergencyStopActive
 
 /***************************************************************************ISSSingalActive*****/
-
         if(ISSSingalActive.set != 0){
             if(++ISSSingalActive.count >= ISSSingalActive.set){
 
@@ -1104,8 +1105,8 @@ void ControlLeds(){
                    }
                }
            }
-       }//ISSSingalActive
-
+        }//ISSSingalActive
+/***************************************************************************AutomaticAligmentDone*****/
         if(AutomaticAligmentDone.set != 0){
             if(++AutomaticAligmentDone.count >= AutomaticAligmentDone.set){
 
@@ -1129,6 +1130,7 @@ void ControlLeds(){
                }
             }
         }//AutomaticAligmentDone
+/***********************************************************************just full auto leds*****************************************************************/
         if(Fullautomaticmode && !Semiautomaticmode){
 /*******************************************************************FrontSensorInoperative*****/
             if( FrontSensorInoperative.set != 0){
