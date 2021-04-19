@@ -54,6 +54,7 @@ uint8_t result;
 
 //SEMIAUTOMATIC
 uint8 PumpSlaveBtn = 0;
+bool semi_Automatic_AutoAlignment = false;
 
 bool ISSActiveState      = false;
 bool AutoHizalamaState   = false;
@@ -368,28 +369,23 @@ void Left2PowerSwitchStatusGet(){
     VNQ5050KTRE_LEFT_1CS2_VAL = adc_data[1].value;
 }
 /*----------------------------------------------------------------Right2PowerSwitchStatusGet-------------------------------------------------*/
-
 void Right2PowerSwitchStatusGet(){
     //2 channel POWER SWITCHE(RIGHT)
     VNQ5050KTRE_RIGHT_2CS1_VAL = adc_data[0].value;
     VNQ5050KTRE_RIGHT_2CS2_VAL = adc_data[7].value;
 }
 /*----------------------------------------------------------------Bottom1PowerSwitchStatusGet-------------------------------------------------*/
-
 void Bottom1PowerSwitchStatusGet(){
     VN5T006ASPTRE_BOTTOM_CS1_VAL = adc_data[15].value;
 }
-/*----------------------------------------------------------------AllPowerSwitchSTatusGet-----------------------------------------------------*/
-
+/*------------------------------------------------------------------AllPowerSwitchSTatusGet-----------------------------------------------------*/
 void AllPowerSwitchSTatusGet(){
     Left4PowerSwitchStatusGet();
     Right4PowerSwitchStatusGet();
     Left2PowerSwitchStatusGet();
     Right2PowerSwitchStatusGet();
 }
-/*-------------------------------------------------------------------CanYellowHighLow--------------------------------------------------------*/
-
-
+/*-----------------------------------------------------------------------MCUADCread-------------------------------------------------------------*/
 void MCUADCread(){
     adcStartConversion(adcREG1,adcGROUP1);
 
@@ -401,8 +397,7 @@ void MCUADCread(){
     }
 
 }
-
-
+/*------------------------------------------------------------------------InputInit--------------------------------------------------------------*/
 void InputInit(){
     MCP_Init(2, 0);
     for(int i=1 ; i<=16 ; i++){
@@ -410,6 +405,7 @@ void InputInit(){
     }
 }
 
+/*--------------------------------------------------------------------functions 2 calculate--------------------------------------------------------*/
 void AngleToValue ( int Home , int KatSayi , int Aci ){
     AciSonuc = Home + ( KatSayi * (Aci) );
 }
@@ -421,11 +417,10 @@ void ValueToAngle ( int Home , int KatSayi , int Sensor ){
 void HedefAci ( float Aci){
     AngleValue = 41 * sin(Aci/68);
 }
-
+/*-------------------------------------------------------------------------epromWrite--------------------------------------------------------------*/
 void epromWrite(unsigned int Block_NO,uint8 eeprom_Data[16] ){
 
     //unsigned int loop;
-
     /* Initialize RAM array.*/
     for(int i = 0;i<=sizeof(SpecialRamBlock);i++ ){
         SpecialRamBlock[i] = eeprom_Data[i];
@@ -460,7 +455,6 @@ void epromWrite(unsigned int Block_NO,uint8 eeprom_Data[16] ){
     }
     while(Status!= IDLE);
 
-    BlockNumber=0x1;
     TI_Fee_WriteAsync(Block_NO, &SpecialRamBlock[0]);
     do
     {
@@ -471,7 +465,7 @@ void epromWrite(unsigned int Block_NO,uint8 eeprom_Data[16] ){
     while(Status!=IDLE);
 
 }
-
+/*-------------------------------------------------------------------------eepromRead--------------------------------------------------------------*/
 void eepromRead(unsigned int Block_NO,uint8 eeprom_Data_RX[16]){
         /* Read the block with unknown length */
         unsigned char *Read_Ptr=eeprom_Data_RX;
@@ -497,7 +491,7 @@ void eepromRead(unsigned int Block_NO,uint8 eeprom_Data_RX[16]){
          while(Status!=IDLE);
 
 }
-
+/*-------------------------------------------------------------------------CanYellowHighLow--------------------------------------------------------*/
 void CanYellowHighLow ( bool state ){
 
     if( state ){
@@ -510,7 +504,7 @@ void CanYellowHighLow ( bool state ){
 
     }
 }
-
+/*--------------------------------------------------------------------------CanRedHighLow----------------------------------------------------------*/
 void CanRedHighLow ( bool state ){
 
     if( state ){
@@ -521,6 +515,7 @@ void CanRedHighLow ( bool state ){
         can_tx_data[1] = (0) & 0xFF;
     }
 }
+/*--------------------------------------------------------------------------canMessageCheck----------------------------------------------------------*/
 void canMessageCheck(){
 
     if(!canIsRxMessageArrived(canREG1, canMESSAGE_BOX1)){
@@ -548,7 +543,7 @@ void canMessageCheck(){
             }else if(AttractiveLeftSensorAndCamelNeck <= 150 ){
                 CanYellowHighLow(false);
                 AutoHizalamaState = false;
-                AutoHizalama = false;
+                semi_Automatic_AutoAlignment = false;
             }
 
         }
@@ -681,14 +676,14 @@ void canMessageCheck(){
     }
 
 }
-
+/*--------------------------------------------------------------------------systemActiveCheck----------------------------------------------------------*/
 bool systemActiveCheck(){
 
         SysActive =  MCP_pinRead(GPO_SYSTEM_ACTIVE_PIN);
 
     return SysActive;
 }
-
+/*------------------------------------------------------------------------------ISSCheck---------------------------------------------------------------*/
 bool ISSCheck(){
 
         ISSActiveState = MCP_pinRead(MCP_GPB2);
@@ -697,7 +692,7 @@ bool ISSCheck(){
         }
     return ISSActiveState;
 }
-
+/*---------------------------------------------------------------------getSensorAndCamelNeckValue-----------------------------------------------------*/
 void getSensorAndCamelNeckValue(){
     ADS1018Adcread();
 
@@ -728,105 +723,7 @@ void getSensorAndCamelNeckValue(){
 }
 
 
-
-void semiAutomaticPumpCheck(){
-    if ( PumpSlaveBtn ){ //Button Push UP
-
-        gioSetBit(GIO_PUMP_PORT, GIO_PUMP_PIN, HIGH);
-        /* Can ikili dogrulama */
-        //dikkat ali kodunda id 2 ama burada 4
-        can_tx_data[4] = 1;
-        canTransmit(canREG1, canMESSAGE_BOX4, can_tx_data);//id = 4
-        /* Can ikili dogrulama */
-        fullPumpState = true;
-    }else{
-        if( fullPumpState == true){
-
-            gioSetBit(GIO_PUMP_PORT, GIO_PUMP_PIN, LOW);
-            /* Can ikili dogrulama */
-            can_tx_data[4] = 0;
-            canTransmit(canREG1, canMESSAGE_BOX4, can_tx_data);//id = 4
-            /* Can ikili dogrulama */
-            fullPumpState = false;
-        }
-    }
-
-
-
-}
-
-
-void semiAutomaticAligmentCommandsCheck(){
-    if( !AutoHizalama ){
-
-          if ( AlignmentRight != MCP_pinRead(GIO_ALIGNMENT_RIGHT_BTN_PIN) ){
-              if (AlignmentRight = MCP_pinRead(GIO_ALIGNMENT_RIGHT_BTN_PIN)){ //Button Push UP
-
-                  gioSetBit(GIO_ALIGNMENT_VALF_RIGHT_PORT, GIO_ALIGNMENT_VALF_RIGHT_PIN, HIGH);
-                  gioSetBit(GIO_PUMP_PORT, GIO_PUMP_PIN, HIGH);
-                  AlignmentRightState = true;
-              }else{
-                  if( AlignmentRightState == true){
-
-                      gioSetBit(GIO_ALIGNMENT_VALF_RIGHT_PORT, GIO_ALIGNMENT_VALF_RIGHT_PIN, LOW);
-                      gioSetBit(GIO_PUMP_PORT, GIO_PUMP_PIN, LOW);
-                      AlignmentRightState = false;
-                  }
-              }
-          }//AlignmentRightBTN
-
-          if ( AlignmentLeft != MCP_pinRead(GIO_ALIGNMENT_LEFT_BTN_PIN) ){
-              if (AlignmentLeft = MCP_pinRead(GIO_ALIGNMENT_LEFT_BTN_PIN)){ //Button Push UP
-
-                  gioSetBit(GIO_ALIGNMENT_VALF_LEFT_PORT, GIO_ALIGNMENT_VALF_LEFT_PIN, HIGH);
-                  gioSetBit(GIO_PUMP_PORT, GIO_PUMP_PIN, HIGH);
-                  AlignmentLeftState = true;
-              }else{
-                  if( AlignmentRightState == true){//
-
-                      gioSetBit(GIO_ALIGNMENT_VALF_LEFT_PORT, GIO_ALIGNMENT_VALF_LEFT_PIN, LOW);
-                      gioSetBit(GIO_PUMP_PORT, GIO_PUMP_PIN, LOW);
-                      AlignmentLeftState = false;
-                  }
-              }
-          }//AlignmentLeftBTN
-      }// !AutoHizalama
-
-      if( AutoHizalamaState ){
-
-          if ( AlignmentAuto != MCP_pinRead(GIO_ALIGNMENT_AUTO_BTN_PIN)){
-            if (AlignmentAuto = MCP_pinRead(GIO_ALIGNMENT_AUTO_BTN_PIN)){
-
-                AutoHizalama = true;
-                AlignmentAutoState = true;
-            }else{
-                if( AlignmentAutoState == true){
-                    AlignmentAutoState = false;
-                }
-            }
-          }
-      }//AutoHizalama
-
-      //Acil Stop Butonu
-      if ( StopMode != MCP_pinRead(GIO_STOP_BTN_PIN) ){
-        if (StopMode = MCP_pinRead(GIO_STOP_BTN_PIN)){
-
-            CaliberAcilStopLed.set = DELAY_250MS;
-            AcilStopON = true;
-            StopModeState = true;
-        }else{
-            if( StopModeState == true){
-
-                CaliberAcilStopLed.set = 0;
-                AcilStopON = false;
-                StopModeState = false;
-            }
-        }
-      }//StopMode
-
-}
-
-/*-----------------------------------------------------------------------------------------------------------------------------------------*/
+/*--------------------------------------------------------------------fullAutomaticPumpCheck-------------------------------------------------------*/
 void fullAutomaticPumpCheck(){
     if( full_Automatic_AutoAlignment == false ){
         if ( PumpSlaveBtn ){ //Button Push UP
@@ -849,6 +746,7 @@ void fullAutomaticPumpCheck(){
     }
 
 }
+
 
 /*-----------------------------------------------------------------------------------------------------------------------------------------*/
 void setAligmentProcess(){
@@ -921,20 +819,23 @@ void commandButtonscheck(){
         }
     }
 /************************************************************************ Set mode button bottun pressed***/
-    if ( SetMode = MCP_pinRead(GIO_ALIGNMENT_SET_BTN_PIN) ){
-        if(tick){
-            tick = false;
-            setcounter++;
-            if (++setcounter == 150 ){
-                    set_aligment = !set_aligment;
-                    aligment_buf = set_bit(aligment_buf, 3, 1);
+    if(!Semiautomaticmode){
+        if ( SetMode = MCP_pinRead(GIO_ALIGNMENT_SET_BTN_PIN) ){
+            if(tick){
+                tick = false;
+                setcounter++;
+                if (++setcounter == 150 ){
+                        set_aligment = !set_aligment;
+                        aligment_buf = set_bit(aligment_buf, 3, 1);
+                }
             }
-        }
-    }else{
-        setcounter = 0;
-        aligment_buf = set_bit(aligment_buf, 3, 0);
+        }else{
+            setcounter = 0;
+            aligment_buf = set_bit(aligment_buf, 3, 0);
 
+        }
     }
+
 /************************************************************************ Emergency stop bottun pressed***/
     if ( StopMode != MCP_pinRead(GIO_STOP_BTN_PIN) ){
         if ((StopMode = MCP_pinRead(GIO_STOP_BTN_PIN)) ){
@@ -1034,6 +935,8 @@ void fullAutomaticAligmentCommandsCheck(){
                     }
                 }else{
                     if(full_Automatic_AutoAlignment == false && CalibrationDone == true){
+                        full_Automatic_AutoAlignment=true;
+                    }else if (full_Automatic_AutoAlignment == false && Semiautomaticmode){
                         full_Automatic_AutoAlignment=true;
                     }
                 }
@@ -1171,7 +1074,7 @@ void fullAutomaticAligmentCommandsCheck(){
 }
 
 /*-----------------------------------------------------------------------------------------------------------------------------------------*/
-void fullAutomaticControlLeds(){
+void ControlLeds(){
     if(tick){
         tick=false;
 /***********************************************************************EmergencyStopActive****/
@@ -1198,196 +1101,7 @@ void fullAutomaticControlLeds(){
                }
            }//EmergencyStopActive
         }//EmergencyStopActive
-/*******************************************************************FrontSensorInoperative*****/
-        if( FrontSensorInoperative.set != 0){
-            if( ++FrontSensorInoperative.count >= FrontSensorInoperative.set){
 
-                FrontSensorInoperative.count =0;
-                FrontSensorInoperative.state = !FrontSensorInoperative.state;
-
-                Calibrationbegin.set = 0;
-                CalibrationCancel.set = 0;
-                CalibrationFirstTemprorySettings.set =0;
-                CalibrationSecondTemprorySettings.set =0;
-                CalibrationFinalSettings.set =0;
-                EmergencyStopActive.set =0;
-
-                FifthWheelAnglePositioneRight.set =0;
-                FifthWheelAnglePositioneLeft.set =0;
-                VehicleInRoute.set =0;
-                CalibrationFailure.set =0;
-                AutoHizalamaBitti.set =0;
-
-                full_Automatic_AutoAlignment = false;
-
-                if( FrontSensorInoperative.state ){
-                    CanYellowHighLow(true);
-                    CanRedHighLow(false);
-                }else{
-                    CanYellowHighLow(false);
-                    CanRedHighLow(false);
-                }
-            }
-        }//FrontSensorInoperative
-/*******************************************************************BackSensorInoperative*****/
-        if( BackSensorInoperative.set != 0){
-            if( ++BackSensorInoperative.count >= BackSensorInoperative.set){
-
-                BackSensorInoperative.count =0;
-                BackSensorInoperative.state = !BackSensorInoperative.state;
-
-                Calibrationbegin.set = 0;
-                CalibrationCancel.set = 0;
-                CalibrationFirstTemprorySettings.set =0;
-                CalibrationSecondTemprorySettings.set =0;
-                CalibrationFinalSettings.set =0;
-                EmergencyStopActive.set =0;
-
-                FifthWheelAnglePositioneRight.set =0;
-                FifthWheelAnglePositioneLeft.set =0;
-                VehicleInRoute.set =0;
-                CalibrationFailure.set =0;
-                AutoHizalamaBitti.set =0;
-
-                full_Automatic_AutoAlignment = false;
-
-                if( ArkaSensorAriza.state ){
-                    CanYellowHighLow(false);
-                    CanRedHighLow(true);
-                }else{
-                    CanYellowHighLow(false);
-                    CanRedHighLow(false);
-                }
-            }
-        }//BackSensorInoperative
-/*************************************************************************Calibrationbegin*****/
-        if(Calibrationbegin.set != 0){
-            if(++Calibrationbegin.count >= Calibrationbegin.set){
-
-                Calibrationbegin.state=!Calibrationbegin.state;
-                Calibrationbegin.count = 0;
-
-               if(Calibrationbegin.state){
-                   printf("yellow and red lamp on x1 for 500ms\n");
-                   gioSetBit(GIO_ALIGNMENT_WARNING_LAMP_RED_PORT,GIO_ALIGNMENT_WARNING_LAMP_RED_PIN ,HIGH);//red
-                   gioSetBit(GIO_ALIGNMENT_WARNING_LAMP_RED_PORT,GIO_ALIGNMENT_WARNING_LAMP_YELLOW_PIN ,HIGH);//yellow
-                   Calibrationbegin.counter++;
-               }else{
-                   printf("yellow and red lamp off x1 for 500ms\n");
-                   gioSetBit(GIO_ALIGNMENT_WARNING_LAMP_RED_PORT,GIO_ALIGNMENT_WARNING_LAMP_RED_PIN ,LOW);//red
-                   gioSetBit(GIO_ALIGNMENT_WARNING_LAMP_RED_PORT,GIO_ALIGNMENT_WARNING_LAMP_YELLOW_PIN ,LOW);//yellow
-
-               }
-           }
-       }//Calibrationbegin
-/***********************************************************CalibrationFirstTemprorySettings****/
-        if(CalibrationFirstTemprorySettings.set != 0){
-            if(++CalibrationFirstTemprorySettings.count >= CalibrationFirstTemprorySettings.set){
-
-                CalibrationFirstTemprorySettings.state=!CalibrationFirstTemprorySettings.state;
-                CalibrationFirstTemprorySettings.count = 0;
-
-               if(CalibrationFirstTemprorySettings.state){
-                   gioSetBit(GIO_ALIGNMENT_WARNING_LAMP_RED_PORT,GIO_ALIGNMENT_WARNING_LAMP_RED_PIN ,HIGH);//red
-               }else{
-                   //red lamp off x1 for 250ms
-                   printf("red lamp off x1 for 500ms and yellow keep\n");
-                   gioSetBit(GIO_ALIGNMENT_WARNING_LAMP_RED_PORT,GIO_ALIGNMENT_WARNING_LAMP_RED_PIN ,LOW);//red
-//                   if(CalibrationFirstTemprorySettings.counter>=1){
-//                       CalibrationFirstTemprorySettings.set = 0;
-//                       CalibrationFirstTemprorySettings.counter = 0;
-//                   }
-               }
-           }
-       }//CalibrationFirstTemprorySettings
-/***********************************************************CalibrationSecondTemprorySettings****/
-        if(CalibrationSecondTemprorySettings.set != 0){
-            if(++CalibrationSecondTemprorySettings.count >= CalibrationSecondTemprorySettings.set){
-
-                CalibrationSecondTemprorySettings.state=!CalibrationSecondTemprorySettings.state;
-                CalibrationSecondTemprorySettings.count = 0;
-
-               if(CalibrationSecondTemprorySettings.state){
-                   printf("yellow and red lamp on keep\n");
-                   CalibrationSecondTemprorySettings.counter++;
-               }else{
-                   if(CalibrationSecondTemprorySettings.counter>=1){
-                       CalibrationSecondTemprorySettings.set = 0;
-                       CalibrationSecondTemprorySettings.counter = 0;
-                   }
-               }
-           }
-       }//CalibrationSecondTemprorySettings
-/*******************************************************************CalibrationFinalSettings*****/
-
-        if(CalibrationFinalSettings.set != 0){
-            if(++CalibrationFinalSettings.count >= CalibrationFinalSettings.set){
-
-                CalibrationFinalSettings.state=!CalibrationFinalSettings.state;
-                CalibrationFinalSettings.count = 0;
-
-               if(CalibrationFinalSettings.state){
-                   printf("yellow and red lamp on 250 x3\n");
-                   gioSetBit(GIO_ALIGNMENT_WARNING_LAMP_RED_PORT,GIO_ALIGNMENT_WARNING_LAMP_RED_PIN ,HIGH);//red
-                   gioSetBit(GIO_ALIGNMENT_WARNING_LAMP_RED_PORT,GIO_ALIGNMENT_WARNING_LAMP_YELLOW_PIN ,HIGH);//yellow
-
-                   CalibrationFinalSettings.counter++;
-               }else{
-                   printf("yellow and red lamp off 250 x3\n");
-                   gioSetBit(GIO_ALIGNMENT_WARNING_LAMP_RED_PORT,GIO_ALIGNMENT_WARNING_LAMP_RED_PIN ,LOW);//red
-                   gioSetBit(GIO_ALIGNMENT_WARNING_LAMP_RED_PORT,GIO_ALIGNMENT_WARNING_LAMP_YELLOW_PIN ,LOW);//yellow
-                   if(CalibrationFinalSettings.counter>=3){
-                       CalibrationFinalSettings.set = 0;
-                       CalibrationFinalSettings.counter = 0;
-                   }
-               }
-           }
-       }//CalibrationFinalSettings
-/*************************************************************************CalibrationCancel******/
-
-        if(CalibrationCancel.set != 0){
-            if(++CalibrationCancel.count >= CalibrationCancel.set){
-
-                CalibrationCancel.state=!CalibrationCancel.state;
-                CalibrationCancel.count = 0;
-
-               if(CalibrationCancel.state){
-                   printf("yellow lamp on 500 x2  //red lamp on 2saniye x1 \n");
-                   CalibrationCancel.counter++;
-               }else{
-                   printf("yellow lamp off 500 x2  //red lamp on 2saniye x1 \n");
-                   if(CalibrationCancel.counter>=3){
-                       printf("yellow lamp off 500 x2  //red lamp off 2saniye x1 \n");
-                       CalibrationCancel.set = 0;
-                       CalibrationCancel.counter = 0;
-                   }
-               }
-           }
-       }//CalibrationCancel
-/************************************************************************CalibrationFailure*****/
-
-        if(CalibrationFailure.set != 0){
-            if(++CalibrationFailure.count >= CalibrationFailure.set){
-
-                CalibrationFailure.state=!CalibrationFailure.state;
-                CalibrationFailure.count = 0;
-
-               if(CalibrationFailure.state){
-                   printf("yellow and red lamp on x1 for 250ms\n");
-                   gioSetBit(GIO_ALIGNMENT_WARNING_LAMP_RED_PORT,GIO_ALIGNMENT_WARNING_LAMP_RED_PIN ,HIGH);//red
-                   gioSetBit(GIO_ALIGNMENT_WARNING_LAMP_YELLOW_PORT,GIO_ALIGNMENT_WARNING_LAMP_YELLOW_PIN ,HIGH);//red
-                   CalibrationFailure.counter++;
-               }else{
-                   printf("yellow and red lamp off x1 for 250ms\n");
-                   gioSetBit(GIO_ALIGNMENT_WARNING_LAMP_RED_PORT,GIO_ALIGNMENT_WARNING_LAMP_RED_PIN ,LOW);//red
-                   gioSetBit(GIO_ALIGNMENT_WARNING_LAMP_YELLOW_PORT,GIO_ALIGNMENT_WARNING_LAMP_YELLOW_PIN ,LOW);//red
-
-                   if(CalibrationFailure.counter>=1){
-                       CalibrationFailure.counter = 0;
-                   }
-               }
-           }//CalibrationFailure
-        }//CalibrationFailure
 /***************************************************************************ISSSingalActive*****/
 
         if(ISSSingalActive.set != 0){
@@ -1412,7 +1126,6 @@ void fullAutomaticControlLeds(){
                }
            }
        }//ISSSingalActive
-/***********************************************************************AutomaticAligmentDone****/
 
         if(AutomaticAligmentDone.set != 0){
             if(++AutomaticAligmentDone.count >= AutomaticAligmentDone.set){
@@ -1423,108 +1136,263 @@ void fullAutomaticControlLeds(){
                if(AutomaticAligmentDone.state){
                    printf("yellow and red lamp on 250 x2\n");
                    gioSetBit(GIO_ALIGNMENT_WARNING_LAMP_RED_PORT,GIO_ALIGNMENT_WARNING_LAMP_RED_PIN ,HIGH);//red
-                   gioSetBit(GIO_ALIGNMENT_WARNING_LAMP_RED_PORT,GIO_ALIGNMENT_WARNING_LAMP_YELLOW_PIN ,HIGH);//yellow
+                   gioSetBit(GIO_ALIGNMENT_WARNING_LAMP_YELLOW_PORT,GIO_ALIGNMENT_WARNING_LAMP_YELLOW_PIN ,HIGH);//yellow
                    AutomaticAligmentDone.counter++;
                }else{
                    printf("yellow and red lamp off 250 x2\n");
                    gioSetBit(GIO_ALIGNMENT_WARNING_LAMP_RED_PORT,GIO_ALIGNMENT_WARNING_LAMP_RED_PIN ,LOW);//red
-                   gioSetBit(GIO_ALIGNMENT_WARNING_LAMP_RED_PORT,GIO_ALIGNMENT_WARNING_LAMP_YELLOW_PIN ,LOW);//yellow
+                   gioSetBit(GIO_ALIGNMENT_WARNING_LAMP_YELLOW_PORT,GIO_ALIGNMENT_WARNING_LAMP_YELLOW_PIN ,LOW);//yellow
                    if(AutomaticAligmentDone.counter>=2){
                        AutomaticAligmentDone.set = 0;
                        AutomaticAligmentDone.counter = 0;
+
                    }
                }
-           }
-       }//AutomaticAligmentDone
-/************************************************************************VehicleInRoute*********/
-        if ( VehicleInRoute.set !=0){
-               if( ++VehicleInRoute.count >= VehicleInRoute.set){
+            }
+        }//AutomaticAligmentDone
+        if(Fullautomaticmode && !Semiautomaticmode){
+/*******************************************************************FrontSensorInoperative*****/
+            if( FrontSensorInoperative.set != 0){
+                if( ++FrontSensorInoperative.count >= FrontSensorInoperative.set){
 
-                   VehicleInRoute.count =0;
-                   VehicleInRoute.state = !VehicleInRoute.state;
+                    FrontSensorInoperative.count =0;
+                    FrontSensorInoperative.state = !FrontSensorInoperative.state;
 
-                   CanYellowHighLow(true);
-                   CanRedHighLow(true);
+                    Calibrationbegin.set = 0;
+                    CalibrationCancel.set = 0;
+                    CalibrationFirstTemprorySettings.set =0;
+                    CalibrationSecondTemprorySettings.set =0;
+                    CalibrationFinalSettings.set =0;
+                    EmergencyStopActive.set =0;
 
-               }
-           }//VehicleInRoute
-/*********************************************************FifthWheelAnglePositioneRight*********/
-           if ( FifthWheelAnglePositioneRight.set !=0 ){
-               if( ++FifthWheelAnglePositioneRight.count >= FifthWheelAnglePositioneRight.set){
+                    FifthWheelAnglePositioneRight.set =0;
+                    FifthWheelAnglePositioneLeft.set =0;
+                    VehicleInRoute.set =0;
+                    CalibrationFailure.set =0;
+                    AutoHizalamaBitti.set =0;
 
-                   FifthWheelAnglePositioneRight.count =0;
-                   FifthWheelAnglePositioneRight.state = !FifthWheelAnglePositioneRight.state;
+                    full_Automatic_AutoAlignment = false;
 
-                   CanRedHighLow(true);
-                   if( FifthWheelAnglePositioneRight.state){
-                       CanYellowHighLow(true);
+                    if( FrontSensorInoperative.state ){
+                        CanYellowHighLow(true);
+                        CanRedHighLow(false);
+                    }else{
+                        CanYellowHighLow(false);
+                        CanRedHighLow(false);
+                    }
+                }
+            }//FrontSensorInoperative
+/*******************************************************************BackSensorInoperative*****/
+            if( BackSensorInoperative.set != 0){
+                if( ++BackSensorInoperative.count >= BackSensorInoperative.set){
+
+                    BackSensorInoperative.count =0;
+                    BackSensorInoperative.state = !BackSensorInoperative.state;
+
+                    Calibrationbegin.set = 0;
+                    CalibrationCancel.set = 0;
+                    CalibrationFirstTemprorySettings.set =0;
+                    CalibrationSecondTemprorySettings.set =0;
+                    CalibrationFinalSettings.set =0;
+                    EmergencyStopActive.set =0;
+
+                    FifthWheelAnglePositioneRight.set =0;
+                    FifthWheelAnglePositioneLeft.set =0;
+                    VehicleInRoute.set =0;
+                    CalibrationFailure.set =0;
+                    AutoHizalamaBitti.set =0;
+
+                    full_Automatic_AutoAlignment = false;
+
+                    if( ArkaSensorAriza.state ){
+                        CanYellowHighLow(false);
+                        CanRedHighLow(true);
+                    }else{
+                        CanYellowHighLow(false);
+                        CanRedHighLow(false);
+                    }
+                }
+            }//BackSensorInoperative
+/*************************************************************************Calibrationbegin*****/
+            if(Calibrationbegin.set != 0){
+                if(++Calibrationbegin.count >= Calibrationbegin.set){
+
+                    Calibrationbegin.state=!Calibrationbegin.state;
+                    Calibrationbegin.count = 0;
+
+                   if(Calibrationbegin.state){
+                       printf("yellow and red lamp on x1 for 500ms\n");
+                       gioSetBit(GIO_ALIGNMENT_WARNING_LAMP_RED_PORT,GIO_ALIGNMENT_WARNING_LAMP_RED_PIN ,HIGH);//red
+                       gioSetBit(GIO_ALIGNMENT_WARNING_LAMP_RED_PORT,GIO_ALIGNMENT_WARNING_LAMP_YELLOW_PIN ,HIGH);//yellow
+                       Calibrationbegin.counter++;
                    }else{
-                       CanYellowHighLow(false);
+                       printf("yellow and red lamp off x1 for 500ms\n");
+                       gioSetBit(GIO_ALIGNMENT_WARNING_LAMP_RED_PORT,GIO_ALIGNMENT_WARNING_LAMP_RED_PIN ,LOW);//red
+                       gioSetBit(GIO_ALIGNMENT_WARNING_LAMP_RED_PORT,GIO_ALIGNMENT_WARNING_LAMP_YELLOW_PIN ,LOW);//yellow
+
                    }
                }
-           }//FifthWheelAnglePositioneRight
+           }//Calibrationbegin
+/***********************************************************CalibrationFirstTemprorySettings****/
+            if(CalibrationFirstTemprorySettings.set != 0){
+                if(++CalibrationFirstTemprorySettings.count >= CalibrationFirstTemprorySettings.set){
+
+                    CalibrationFirstTemprorySettings.state=!CalibrationFirstTemprorySettings.state;
+                    CalibrationFirstTemprorySettings.count = 0;
+
+                   if(CalibrationFirstTemprorySettings.state){
+                       gioSetBit(GIO_ALIGNMENT_WARNING_LAMP_RED_PORT,GIO_ALIGNMENT_WARNING_LAMP_RED_PIN ,HIGH);//red
+                   }else{
+                       //red lamp off x1 for 250ms
+                       printf("red lamp off x1 for 500ms and yellow keep\n");
+                       gioSetBit(GIO_ALIGNMENT_WARNING_LAMP_RED_PORT,GIO_ALIGNMENT_WARNING_LAMP_RED_PIN ,LOW);//red
+    //                   if(CalibrationFirstTemprorySettings.counter>=1){
+    //                       CalibrationFirstTemprorySettings.set = 0;
+    //                       CalibrationFirstTemprorySettings.counter = 0;
+    //                   }
+                   }
+               }
+           }//CalibrationFirstTemprorySettings
+/***********************************************************CalibrationSecondTemprorySettings****/
+            if(CalibrationSecondTemprorySettings.set != 0){
+                if(++CalibrationSecondTemprorySettings.count >= CalibrationSecondTemprorySettings.set){
+
+                    CalibrationSecondTemprorySettings.state=!CalibrationSecondTemprorySettings.state;
+                    CalibrationSecondTemprorySettings.count = 0;
+
+                   if(CalibrationSecondTemprorySettings.state){
+                       printf("yellow and red lamp on keep\n");
+                       CalibrationSecondTemprorySettings.counter++;
+                   }else{
+                       if(CalibrationSecondTemprorySettings.counter>=1){
+                           CalibrationSecondTemprorySettings.set = 0;
+                           CalibrationSecondTemprorySettings.counter = 0;
+                       }
+                   }
+               }
+           }//CalibrationSecondTemprorySettings
+/*******************************************************************CalibrationFinalSettings*****/
+
+            if(CalibrationFinalSettings.set != 0){
+                if(++CalibrationFinalSettings.count >= CalibrationFinalSettings.set){
+
+                    CalibrationFinalSettings.state=!CalibrationFinalSettings.state;
+                    CalibrationFinalSettings.count = 0;
+
+                   if(CalibrationFinalSettings.state){
+                       printf("yellow and red lamp on 250 x3\n");
+                       gioSetBit(GIO_ALIGNMENT_WARNING_LAMP_RED_PORT,GIO_ALIGNMENT_WARNING_LAMP_RED_PIN ,HIGH);//red
+                       gioSetBit(GIO_ALIGNMENT_WARNING_LAMP_RED_PORT,GIO_ALIGNMENT_WARNING_LAMP_YELLOW_PIN ,HIGH);//yellow
+
+                       CalibrationFinalSettings.counter++;
+                   }else{
+                       printf("yellow and red lamp off 250 x3\n");
+                       gioSetBit(GIO_ALIGNMENT_WARNING_LAMP_RED_PORT,GIO_ALIGNMENT_WARNING_LAMP_RED_PIN ,LOW);//red
+                       gioSetBit(GIO_ALIGNMENT_WARNING_LAMP_RED_PORT,GIO_ALIGNMENT_WARNING_LAMP_YELLOW_PIN ,LOW);//yellow
+                       if(CalibrationFinalSettings.counter>=3){
+                           CalibrationFinalSettings.set = 0;
+                           CalibrationFinalSettings.counter = 0;
+                       }
+                   }
+               }
+           }//CalibrationFinalSettings
+/*************************************************************************CalibrationCancel******/
+
+            if(CalibrationCancel.set != 0){
+                if(++CalibrationCancel.count >= CalibrationCancel.set){
+
+                    CalibrationCancel.state=!CalibrationCancel.state;
+                    CalibrationCancel.count = 0;
+
+                   if(CalibrationCancel.state){
+                       printf("yellow lamp on 500 x2  //red lamp on 2saniye x1 \n");
+                       CalibrationCancel.counter++;
+                   }else{
+                       printf("yellow lamp off 500 x2  //red lamp on 2saniye x1 \n");
+                       if(CalibrationCancel.counter>=3){
+                           printf("yellow lamp off 500 x2  //red lamp off 2saniye x1 \n");
+                           CalibrationCancel.set = 0;
+                           CalibrationCancel.counter = 0;
+                       }
+                   }
+               }
+           }//CalibrationCancel
+/************************************************************************CalibrationFailure*****/
+
+            if(CalibrationFailure.set != 0){
+                if(++CalibrationFailure.count >= CalibrationFailure.set){
+
+                    CalibrationFailure.state=!CalibrationFailure.state;
+                    CalibrationFailure.count = 0;
+
+                   if(CalibrationFailure.state){
+                       printf("yellow and red lamp on x1 for 250ms\n");
+                       gioSetBit(GIO_ALIGNMENT_WARNING_LAMP_RED_PORT,GIO_ALIGNMENT_WARNING_LAMP_RED_PIN ,HIGH);//red
+                       gioSetBit(GIO_ALIGNMENT_WARNING_LAMP_YELLOW_PORT,GIO_ALIGNMENT_WARNING_LAMP_YELLOW_PIN ,HIGH);//red
+                       CalibrationFailure.counter++;
+                   }else{
+                       printf("yellow and red lamp off x1 for 250ms\n");
+                       gioSetBit(GIO_ALIGNMENT_WARNING_LAMP_RED_PORT,GIO_ALIGNMENT_WARNING_LAMP_RED_PIN ,LOW);//red
+                       gioSetBit(GIO_ALIGNMENT_WARNING_LAMP_YELLOW_PORT,GIO_ALIGNMENT_WARNING_LAMP_YELLOW_PIN ,LOW);//red
+
+                       if(CalibrationFailure.counter>=1){
+                           CalibrationFailure.counter = 0;
+                       }
+                   }
+               }//CalibrationFailure
+            }//CalibrationFailure
+/************************************************************************VehicleInRoute*********/
+            if ( VehicleInRoute.set !=0){
+                   if( ++VehicleInRoute.count >= VehicleInRoute.set){
+
+                       VehicleInRoute.count =0;
+                       VehicleInRoute.state = !VehicleInRoute.state;
+
+                       CanYellowHighLow(true);
+                       CanRedHighLow(true);
+
+                   }
+               }//VehicleInRoute
+/*********************************************************FifthWheelAnglePositioneRight*********/
+               if ( FifthWheelAnglePositioneRight.set !=0 ){
+                   if( ++FifthWheelAnglePositioneRight.count >= FifthWheelAnglePositioneRight.set){
+
+                       FifthWheelAnglePositioneRight.count =0;
+                       FifthWheelAnglePositioneRight.state = !FifthWheelAnglePositioneRight.state;
+
+                       CanRedHighLow(true);
+                       if( FifthWheelAnglePositioneRight.state){
+                           CanYellowHighLow(true);
+                       }else{
+                           CanYellowHighLow(false);
+                       }
+                   }
+               }//FifthWheelAnglePositioneRight
 
 /*********************************************************FifthWheelAnglePositioneLeft*********/
-           if ( FifthWheelAnglePositioneLeft.set !=0 ){
-               if( ++FifthWheelAnglePositioneLeft.count >= FifthWheelAnglePositioneLeft.set){
+               if ( FifthWheelAnglePositioneLeft.set !=0 ){
+                   if( ++FifthWheelAnglePositioneLeft.count >= FifthWheelAnglePositioneLeft.set){
 
-                   FifthWheelAnglePositioneLeft.count =0;
-                   FifthWheelAnglePositioneLeft.state = !FifthWheelAnglePositioneLeft.state;
+                       FifthWheelAnglePositioneLeft.count =0;
+                       FifthWheelAnglePositioneLeft.state = !FifthWheelAnglePositioneLeft.state;
 
-                   CanYellowHighLow(true);
-                   if( FifthWheelAnglePositioneLeft.state){
-                       CanRedHighLow(true);
-                   }else{
-                       CanRedHighLow(false);
+                       CanYellowHighLow(true);
+                       if( FifthWheelAnglePositioneLeft.state){
+                           CanRedHighLow(true);
+                       }else{
+                           CanRedHighLow(false);
+                       }
                    }
-               }
-           }//FifthWheelAnglePositioneLeft
+               }//FifthWheelAnglePositioneLeft
+        }
 
     }//tick
 
 }
-/*-----------------------------------------------------------------------------------------------------------------------------------------*/
-void semiAutomaticControlLeds( void ){
-
-    if( AutoHizalamaBitti.set !=0 ){
-        if( ++AutoHizalamaBitti.count >= AutoHizalamaBitti.set ){
-
-            AcilStopON = true;
-            AutoHizalamaBitti.count =0;
-            AutoHizalamaBitti.state = !AutoHizalamaBitti.state;
-
-            if( AutoHizalamaBitti.counter <=1 ){
-                if( AutoHizalamaBitti.state ){
-                    CanYellowHighLow(false);
-                    CanRedHighLow(false);
-                }else{
-                    CanYellowHighLow(true);
-                    CanRedHighLow(true);
-                    AutoHizalamaBitti.counter++;
-                }
-
-                canTransmit(canREG1, canMESSAGE_BOX4, can_tx_data);//id = 4
-            }else{
-                AutoHizalama = false;
-                AcilStopON = false;
-                canTransmit(canREG1, canMESSAGE_BOX4, can_tx_data);//id = 4
-
-                AutoHizalamaBitti.state =0;
-                AutoHizalamaBitti.set =0;
-            }
-        }
-    }//AutoHizalamaBitti.set
-
-}
 
 
 
-void semiAutomaticCommandsCheck(){
-    semiAutomaticPumpCheck();
-    semiAutomaticAligmentCommandsCheck();
-}
-
-void fullAutomaticCommandCheck(){
+void CommandCheck(){
 
         fullAutomaticPumpCheck();
         fullAutomaticAligmentCommandsCheck();
@@ -1552,7 +1420,6 @@ void modeWarning(){
                 }else{
                     Fullautomaticmode = false;
                     Semiautomaticmode = true;
-                    CalibrationFailure.set = DELAY_250MS;
                     Semiautomaticled.state =0;
                     Semiautomaticled.set =0;
                 }
@@ -1600,7 +1467,7 @@ void semiAutomaticAutoHizalamaProcess(){
 
         AutomaticAligmentDone.set = 5;
         AutomaticAligmentDone.counter =0;
-        AutoHizalama = false;
+        semi_Automatic_AutoAlignment = false;
 
     }else if( sensorRight == 0 && AttractiveLeftSensorAndCamelNeck >= 2500){
         gioSetBit(GIO_ALIGNMENT_VALF_RIGHT_PORT, GIO_ALIGNMENT_VALF_RIGHT_PIN,LOW);
@@ -1617,7 +1484,7 @@ void semiAutomaticAutoHizalamaProcess(){
         gioSetBit(GIO_ALIGNMENT_VALF_LEFT_PORT, GIO_ALIGNMENT_VALF_LEFT_PIN,LOW);
         gioSetBit(GIO_PUMP_PORT,GIO_PUMP_PIN,LOW);
 
-        AutoHizalama = false;
+        semi_Automatic_AutoAlignment = false;
     }
 }
 
@@ -1743,8 +1610,8 @@ void main(void)
                 if(full_Automatic_AutoAlignment){
                     fullAutomaticAutoAlignmentProcess();
                 }
-                fullAutomaticControlLeds();
-                fullAutomaticCommandCheck();
+                ControlLeds();
+                CommandCheck();
 
             }else{
                 fullAutomaticStandBymode();
@@ -1756,23 +1623,16 @@ void main(void)
  /******************************************************************************Semiautomaticmode*****************************************************/
 
         if(Semiautomaticmode){
-            can_tx_data[3] = 0;
-            canTransmit(canREG1, canMESSAGE_BOX4, can_tx_data);//id = 4
             if(systemActiveCheck()&& ISSCheck()!=true){
 
                 gioSetBit(GIO_OIL_PUMP_PORT, GIO_OIL_PUMP_PIN, HIGH);
-                can_tx_data[2] = 255;
-                canTransmit(canREG1, canMESSAGE_BOX4, can_tx_data);//id = 4
 
-                if( AutoHizalama ){
+                if( full_Automatic_AutoAlignment ){
                     semiAutomaticAutoHizalamaProcess();
                 }
 
-                if(tick){
-                    tick = false;
-                    semiAutomaticCommandsCheck();
-                    semiAutomaticControlLeds();
-                }
+                ControlLeds();
+                CommandCheck();
 
             }else{
                 semiAutomaticStandByMode();
