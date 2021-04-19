@@ -46,18 +46,12 @@
  *
  *
  */
-uint16 myinput[16];
-uint8_t result;
 
-
-
-
-//SEMIAUTOMATIC
 uint8 PumpSlaveBtn = 0;
 bool semi_Automatic_AutoAlignment = false;
 
 bool ISSActiveState      = false;
-bool AutoHizalamaState   = false;
+bool AutoAligmentState   = false;
 bool AlignmentRightState = false;
 bool AlignmentLeftState  = false;
 bool AlignmentAutoState  = false;
@@ -117,30 +111,16 @@ float FifthWheelNumberTemporary;
 int FifthWheelNumberValue =0;
 int CamelneckNumberValue =0;
 
-typedef struct leds{
-
-    bool state;
-    uint8_t count;
-    uint8_t set;
-    uint8_t counter;
-
-}Led;
-
-Led Fullautomaticled;
-Led Semiautomaticled;
-
-Led AutoHizalamaBitti;
-Led CaliberBozuk;
-Led OnSensorAriza;
-Led ArkaSensorAriza;
-Led CaliberAcilStopLed;
-
 typedef struct timer{
     uint16_t set;
     uint16_t count;
     bool state;
     uint16_t counter;
 }Timers;
+
+Timers Fullautomaticled;
+Timers Semiautomaticled;
+
 Timers ModeSelectDelay;
 Timers Calibrationbegin;
 Timers CalibrationFirstTemprorySettings;
@@ -528,7 +508,7 @@ void canMessageCheck(){
         sensorLeft =  can_rx_data[1];
         PumpSlaveBtn =can_rx_data[2];
 
-        if( !AcilStopON ){
+        if( !emergency_stop ){
 
             if( sensorRight == true && sensorLeft == true ){
                 CanRedHighLow(true);
@@ -538,11 +518,11 @@ void canMessageCheck(){
 
             if( AttractiveLeftSensorAndCamelNeck >= 2500 ){
                 CanYellowHighLow(true);
-                AutoHizalamaState = true;
+                AutoAligmentState = true;
 
             }else if(AttractiveLeftSensorAndCamelNeck <= 150 ){
                 CanYellowHighLow(false);
-                AutoHizalamaState = false;
+                AutoAligmentState = false;
                 semi_Automatic_AutoAlignment = false;
             }
 
@@ -573,7 +553,7 @@ void canMessageCheck(){
 
             if( canSensorData >= (AciSonuc - 5)  && canSensorData <= (AciSonuc + 5) ){
 
-                AutoHizalamaState = false;
+                AutoAligmentState = false;
 
                 VehicleInRoute.set = DELAY_250MS;
                 FifthWheelAnglePositioneRight.set =0;
@@ -584,7 +564,7 @@ void canMessageCheck(){
 
            }else if( canSensorData <  AciSonuc  && canSensorData > eeprom_read_data.FifthWheelLeftAngle){
 
-                AutoHizalamaState = true;
+                AutoAligmentState = true;
 
                 VehicleInRoute.set =0;
                 FifthWheelAnglePositioneRight.set =0;
@@ -594,7 +574,7 @@ void canMessageCheck(){
                 BackSensorInoperative.set =0;
 
            }else if( canSensorData > AciSonuc  && canSensorData < eeprom_read_data.FifthWheelRightAngle ){
-                AutoHizalamaState = true;
+                AutoAligmentState = true;
 
                 VehicleInRoute.set =0;
                 FifthWheelAnglePositioneRight.set =DELAY_500MS;
@@ -605,7 +585,7 @@ void canMessageCheck(){
 
             }else if( canSensorData  < (eeprom_read_data.FifthWheelLeftAngle - 300)){
                 if(canSensorData  < (eeprom_read_data.FifthWheelLeftAngle - 350)){
-                    CaliberBozuk.set = DELAY_250MS;
+                    CalibrationFailure.set = DELAY_250MS;
 
                     VehicleInRoute.set =0;
                     FifthWheelAnglePositioneRight.set =0;
@@ -622,7 +602,7 @@ void canMessageCheck(){
                 }
             }else if( canSensorData > (eeprom_read_data.FifthWheelRightAngle + 300)){
                 if(canSensorData  > (eeprom_read_data.FifthWheelRightAngle + 350)){
-                    CaliberBozuk.set = DELAY_250MS;
+                    CalibrationFailure.set = DELAY_250MS;
 
                     VehicleInRoute.set =0;
                     FifthWheelAnglePositioneRight.set =0;
@@ -935,9 +915,9 @@ void fullAutomaticAligmentCommandsCheck(){
                     }
                 }else{
                     if(full_Automatic_AutoAlignment == false && CalibrationDone == true){
-                        full_Automatic_AutoAlignment=true;
+                        full_Automatic_AutoAlignment = true;
                     }else if (full_Automatic_AutoAlignment == false && Semiautomaticmode){
-                        full_Automatic_AutoAlignment=true;
+                        semi_Automatic_AutoAlignment =true;
                     }
                 }
             }
@@ -1011,7 +991,6 @@ void fullAutomaticAligmentCommandsCheck(){
                     eeprom_read_data.FifthWheelNumber = FifthWheelNumberTemporary/100;
 
                     aligment_set_level = 0;
-                    CalibrationDone = true;
                     printf("yellow and red lamp off\n");
                     gioSetBit(GIO_ALIGNMENT_WARNING_LAMP_RED_PORT,GIO_ALIGNMENT_WARNING_LAMP_YELLOW_PIN ,LOW);//red
                     gioSetBit(GIO_ALIGNMENT_WARNING_LAMP_RED_PORT,GIO_ALIGNMENT_WARNING_LAMP_RED_PIN ,LOW);//red
@@ -1032,9 +1011,8 @@ void fullAutomaticAligmentCommandsCheck(){
             CalibrationSecondTemprorySettings.set = 0;
             CalibrationFinalSettings.set = 0;
             CalibrationCancel.set = 0;
-            //CalibrationFailure.set = 0;
             set_aligment = false;
-           aligment_set_level = 0 ;
+            aligment_set_level = 0 ;
             FifthWheelAnglePositioneLeft.set = 0;
             FifthWheelAnglePositioneRight.set = 0;
             VehicleInRoute.set = 0;
@@ -1097,6 +1075,7 @@ void ControlLeds(){
                    if(Calibrationbegin.counter>=1){
                        EmergencyStopActive.set = 0;
                        EmergencyStopActive.counter = 0;
+                       CalibrationFailure.set = DELAY_250MS;
                    }
                }
            }//EmergencyStopActive
@@ -1169,7 +1148,6 @@ void ControlLeds(){
                     FifthWheelAnglePositioneLeft.set =0;
                     VehicleInRoute.set =0;
                     CalibrationFailure.set =0;
-                    AutoHizalamaBitti.set =0;
 
                     full_Automatic_AutoAlignment = false;
 
@@ -1200,11 +1178,10 @@ void ControlLeds(){
                     FifthWheelAnglePositioneLeft.set =0;
                     VehicleInRoute.set =0;
                     CalibrationFailure.set =0;
-                    AutoHizalamaBitti.set =0;
 
                     full_Automatic_AutoAlignment = false;
 
-                    if( ArkaSensorAriza.state ){
+                    if( BackSensorInoperative.state ){
                         CanYellowHighLow(false);
                         CanRedHighLow(true);
                     }else{
@@ -1292,6 +1269,8 @@ void ControlLeds(){
                        if(CalibrationFinalSettings.counter>=3){
                            CalibrationFinalSettings.set = 0;
                            CalibrationFinalSettings.counter = 0;
+                           CalibrationDone = true;
+
                        }
                    }
                }
@@ -1490,8 +1469,7 @@ void semiAutomaticAutoHizalamaProcess(){
 
 void semiAutomaticStandByMode(){
 
-    AcilStopON = true;
-
+    emergency_stop = true ;
     gioSetBit(GIO_ALIGNMENT_VALF_LEFT_PORT, GIO_ALIGNMENT_VALF_LEFT_PIN,LOW);
     gioSetBit(GIO_ALIGNMENT_VALF_RIGHT_PORT, GIO_ALIGNMENT_VALF_RIGHT_PIN,LOW);
     gioSetBit(GIO_PUMP_PORT,GIO_PUMP_PIN,LOW);
@@ -1504,6 +1482,11 @@ void semiAutomaticStandByMode(){
 }
 
 void fullAutomaticStandBymode(){
+
+    emergency_stop = true;
+    full_Automatic_AutoAlignment = false;
+    full_Automatic_Set_Aligment  = false;
+
     ModeSelectDelay.set = 0;
     Calibrationbegin.set = 0;
     CalibrationFirstTemprorySettings.set = 0;
@@ -1512,17 +1495,21 @@ void fullAutomaticStandBymode(){
     CalibrationCancel.set = 0;
     CalibrationFailure.set = 0;
 
+    set_aligment = false;
+    aligment_set_level = 0 ;
+
     FifthWheelAnglePositioneLeft.set = 0;
     FifthWheelAnglePositioneRight.set = 0;
+
     VehicleInRoute.set = 0;
 
     AutomaticAligmentDone.set = 0;
     ISSSingalActive.set = 0;
     FrontSensorInoperative.set = 0;
     BackSensorInoperative.set = 0;
+    aligment_set_level = 0;
+    EmergencyStopActive.set = DELAY_250MS;
 
-    EmergencyStopActive.set = 0;
-    full_Automatic_AutoAlignment = false;
     gioSetBit(GIO_ALIGNMENT_VALF_LEFT_PORT, GIO_ALIGNMENT_VALF_LEFT_PIN, LOW);
     gioSetBit(GIO_ALIGNMENT_VALF_RIGHT_PORT, GIO_ALIGNMENT_VALF_RIGHT_PIN, LOW);
     gioSetBit(GIO_PUMP_PORT, GIO_PUMP_PIN,LOW);
@@ -1543,18 +1530,18 @@ void fullAutomaticAutoAlignmentProcess(){
 
 
         full_Automatic_AutoAlignment = false;
-        //AutoHizalamaState = true;
+        //AutoAligmentState = true;
 
     }else if( AciSonuc > canSensorData ){
 
-        AutoHizalamaState = false;
+        AutoAligmentState = false;
         gioSetBit(GIO_ALIGNMENT_VALF_LEFT_PORT, GIO_ALIGNMENT_VALF_LEFT_PIN,HIGH);
         gioSetBit(GIO_ALIGNMENT_VALF_RIGHT_PORT, GIO_ALIGNMENT_VALF_RIGHT_PIN,LOW);
         gioSetBit(GIO_PUMP_PORT,GIO_PUMP_PIN,HIGH);
 
     }else if( AciSonuc < canSensorData ){
 
-        AutoHizalamaState = false;
+        AutoAligmentState = false;
         gioSetBit(GIO_ALIGNMENT_VALF_LEFT_PORT, GIO_ALIGNMENT_VALF_LEFT_PIN,LOW);
         gioSetBit(GIO_ALIGNMENT_VALF_RIGHT_PORT, GIO_ALIGNMENT_VALF_RIGHT_PIN,HIGH);
         gioSetBit(GIO_PUMP_PORT,GIO_PUMP_PIN,HIGH);
@@ -1568,7 +1555,7 @@ void delaymode(){
         for(int i = 0; i <= 10000000; i++){
         }
         ModeSelectDelay.set = 0;
-    }//AutoHizalamaBitti.set
+    }
 }
 void main(void)
 {
@@ -1627,7 +1614,7 @@ void main(void)
 
                 gioSetBit(GIO_OIL_PUMP_PORT, GIO_OIL_PUMP_PIN, HIGH);
 
-                if( full_Automatic_AutoAlignment ){
+                if( semi_Automatic_AutoAlignment ){
                     semiAutomaticAutoHizalamaProcess();
                 }
 
