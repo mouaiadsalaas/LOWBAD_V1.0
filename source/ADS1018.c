@@ -35,7 +35,7 @@ volatile int8_t failStep = 0;
 volatile int8_t currentStep   = 0;
 volatile int8_t successStep   = 0;
 
-uint16_t rcvId[] = { 0xC28B, 0xD28B, 0xE28B, 0xF28B };
+uint16_t rcvId[] = { 0xC58B, 0xD58B, 0xE58B, 0xF58B };
 
 uint16 global_counter;
 uint16 ADS1018Data[4];
@@ -111,6 +111,7 @@ void ADS1018Adcread( void ){
             if( global_counter - beginTime > timeOut ){
                     spiReceiveData(spiREG3,  &dataconfig2_t, 1, (uint16_t*)&ADS1018Data[currentStep]);
                     spiReceiveData(spiREG3,  &dataconfig2_t, 1, (uint16_t*)&ADS1018Data[currentStep]);
+                    ADS1018Data[currentStep] = (ADS1018Data[currentStep] /8);
                     subStep = successStep;
             }else{
                     Register2write();
