@@ -129,7 +129,11 @@ void ChipErase(void) {
 
 }
 
-void Write(uint16_t Adress1, uint16_t Adress2, uint16_t Adress3, uint16_t value){
+void Write(uint32_t Adress, uint16_t value){
+    uint16_t Adress1= Adress>>16;
+    uint16_t Adress2= (Adress>>8)& 0x00FF;
+    uint16_t Adress3= Adress & 0x00FF;
+
     uint16_t Command=WRITE;
 
     WriteEnable();
@@ -153,7 +157,11 @@ void Write(uint16_t Adress1, uint16_t Adress2, uint16_t Adress3, uint16_t value)
 
 }
 
-uint16 Read(uint16_t Adress1, uint16_t Adress2, uint16_t Adress3){
+uint16 Read(uint32_t Adress){
+    uint16_t Adress1= Adress>>16;
+    uint16_t Adress2= (Adress>>8)& 0x00FF;
+    uint16_t Adress3= Adress & 0x00FF;
+
     uint16_t Command = READ;
     uint16_t value ;
 

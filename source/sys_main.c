@@ -27,7 +27,7 @@
 #include "PCA2129.h"
 #include "SST25PF040C.h"
 //NOTES:
-/*1.OUR USEED ADIN PINS ARE:
+/*1.OUR USED ADIN PINS ARE:
  *                        ADIN[0],ADIN[1],
  *                        ADIN[3],ADIN[4],
  *                        ADIN[5],ADIN[6],
@@ -40,7 +40,7 @@
  *
  *3.OUR USED SPI DRIVERS ARE  :
  *                        SPI1,SPI2,SPI3
- *4.SPI1 CONNECTED DEVICE IS  : ADC2129 Real Time Clock and SST25PF040C Flash Memory
+ *4.SPI1 CONNECTED DEVICE IS  : PCA2129 Real Time Clock and SST25PF040C Flash Memory
  *5.SPI2 CONNECTED DEVICE IS  : MCP23S18  GIO  EXPANDER
  *6.SPI3 CONNECTED DEVICE IS  : ADS1018 ANALOG EXPANDER
  *
@@ -149,8 +149,6 @@ typedef enum delays{
 
 }Delays;
 
-
-
 typedef enum botuns{
 
     NOTHING_PRESSED        = 0,
@@ -182,9 +180,7 @@ eepromdata eeprom_read_data = {1,1,1,1,1,1,1,1};
 uint16_t AttractiveRightSensor; // Sensor 1
 uint16_t AttractiveLeftSensorAndCamelNeck; // Sensor 2
 
-
 /**************************************************************************/
-
 uint16_t canSensorData;
 uint8_t aligment_set_level = 0;
 bool PumpState = false;
@@ -210,6 +206,9 @@ uint16 *Dateinfo;
 
 //SST25PF040C
 uint16_t adress_value = 0;
+uint16_t adress_value2 = 0;
+uint16_t adress_value3 = 0;
+uint16_t adress_value4 = 0;
 
 //eeprom
 uint16 u16JobResult,Status;
@@ -239,6 +238,10 @@ float AngleValue =0;
 int mode;
 uint16 GIO_OIL_PUMP_PIN_STATUS = 0 ;
 uint16 GIO_ALIGNMENT_VALF_LEFT_STATUS = 0 ;
+
+uint32_t log_start_adress   = 0x000001;
+
+
 void delay(void)
 {
     unsigned int dummycnt=0x0000FFU;
@@ -1560,6 +1563,9 @@ void oilPumpStatusGet(){
 
     }
 }
+
+//we can just use this function after pressing the button of its output other wise
+//if there is no input there is no output and status can be undefined
 void AlignmentValfLeftStatusGet(){
     Bottom1PowerSwitchStatusGet();
     gioSetBit(GIO_ALIGNMENT_VALF_LEFT_PORT, GIO_ALIGNMENT_VALF_LEFT_PIN, HIGH);
@@ -1569,6 +1575,8 @@ void AlignmentValfLeftStatusGet(){
         //i used GIO_PUMP_PORT this here because i had no one else to use
         //but do not forget to change it and to set flash functions instead
         gioSetBit(GIO_PUMP_PORT, GIO_PUMP_PIN, LOW);
+        //ChipErase();
+
 
     }else if (GIO_OIL_PUMP_PIN_STATUS < 150){
         //printf("oil pump not connected (openload)");
@@ -1581,6 +1589,13 @@ void AlignmentValfLeftStatusGet(){
     }
 }
 
+void logKeep(uint16 output_channel ,uint16 error_code){
+    Write(log_start_adress,output_channel);
+    log_start_adress++;
+    Write(log_start_adress,error_code);
+    log_start_adress++;
+
+}
 void main(void)
 {
     HardwareInit();
@@ -1605,6 +1620,16 @@ void main(void)
     CalibrationFinalSettings.set = 0;
     EmergencyStopActive.set =0;
     CalibrationFailure.set = DELAY_250MS;
+    ChipErase();
+
+    logKeep(0x02, 0x01);
+    logKeep(0x03, 0x01);
+
+    adress_value =  Read(0x000001);
+    adress_value2 = Read(0x000002);
+    adress_value3 = Read(0x000003);
+    adress_value4 = Read(0x000004);
+
     while(1) /* ... continue forever */
     {
 

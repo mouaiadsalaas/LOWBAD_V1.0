@@ -19,6 +19,7 @@ C_SRCS += \
 ../source/ADS1018.c \
 ../source/Device_TMS570LS07.c \
 ../source/Fapi_UserDefinedFunctions.c \
+../source/LOWBAD_IO_PIN.c \
 ../source/MCP23S17.c \
 ../source/PCA2129.c \
 ../source/SST25PF040C.c \
@@ -60,6 +61,7 @@ C_DEPS += \
 ./source/ADS1018.d \
 ./source/Device_TMS570LS07.d \
 ./source/Fapi_UserDefinedFunctions.d \
+./source/LOWBAD_IO_PIN.d \
 ./source/MCP23S17.d \
 ./source/PCA2129.d \
 ./source/SST25PF040C.d \
@@ -101,6 +103,7 @@ OBJS += \
 ./source/ADS1018.obj \
 ./source/Device_TMS570LS07.obj \
 ./source/Fapi_UserDefinedFunctions.obj \
+./source/LOWBAD_IO_PIN.obj \
 ./source/MCP23S17.obj \
 ./source/PCA2129.obj \
 ./source/SST25PF040C.obj \
@@ -154,6 +157,7 @@ OBJS__QUOTED += \
 "source\ADS1018.obj" \
 "source\Device_TMS570LS07.obj" \
 "source\Fapi_UserDefinedFunctions.obj" \
+"source\LOWBAD_IO_PIN.obj" \
 "source\MCP23S17.obj" \
 "source\PCA2129.obj" \
 "source\SST25PF040C.obj" \
@@ -200,6 +204,7 @@ C_DEPS__QUOTED += \
 "source\ADS1018.d" \
 "source\Device_TMS570LS07.d" \
 "source\Fapi_UserDefinedFunctions.d" \
+"source\LOWBAD_IO_PIN.d" \
 "source\MCP23S17.d" \
 "source\PCA2129.d" \
 "source\SST25PF040C.d" \
@@ -248,6 +253,7 @@ C_SRCS__QUOTED += \
 "../source/ADS1018.c" \
 "../source/Device_TMS570LS07.c" \
 "../source/Fapi_UserDefinedFunctions.c" \
+"../source/LOWBAD_IO_PIN.c" \
 "../source/MCP23S17.c" \
 "../source/PCA2129.c" \
 "../source/SST25PF040C.c" \

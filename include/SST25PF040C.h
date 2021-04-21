@@ -66,8 +66,8 @@ uint16 checkBusy(void);
 void WriteEnable();
 void WriteDisable();
 void ChipErase(void);
-void Write(uint16_t Adress1, uint16_t Adress2, uint16_t Adress3, uint16_t value);
-uint16 Read(uint16_t Adress1, uint16_t Adress2, uint16_t Adress3);
+void Write(uint32_t Adress, uint16_t value);
+uint16 Read(uint32_t Adress);
 
 
 #endif /* __SST25PF040C_H_ */
