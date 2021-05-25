@@ -553,8 +553,7 @@ void CanRedHighLow ( bool state ){
 }
 /*--------------------------------------------------------------------------canMessageCheck----------------------------------------------------------*/
 void canMessageCheck(){
-
-    if(!canIsRxMessageArrived(canREG1, canMESSAGE_BOX1)){
+    if(canIsRxMessageArrived(canREG1, canMESSAGE_BOX1)){
         canGetData(canREG1, canMESSAGE_BOX1,can_rx_data);  /* receive on can2  */ //id 1
     }
 
@@ -599,11 +598,11 @@ void canMessageCheck(){
         HedefAci(DegerSonuc);
         AngleToValue(eeprom_read_data.FifthWheelHome, eeprom_read_data.FifthWheelNumber, AngleValue);
 
-//        canSensorData = can_rx_data[0];
-//        canSensorData <<= 8;
-//        canSensorData |= can_rx_data[1];
-        canSensorData = (ADS1018Data[2]-1000);
-        PumpSlaveBtn =  can_rx_data[2];
+        canSensorData = can_rx_data[0];
+        canSensorData <<= 8;
+        canSensorData |= can_rx_data[1];
+//        canSensorData = (ADS1018Data[2]-1000);
+//        PumpSlaveBtn =  can_rx_data[2];
 
         if( CalibrationDone == true){
 
@@ -1661,95 +1660,91 @@ void oilPumpStatusCheck(uint8_t pin2check){
 
 void main(void)
 {
-//    HardwareInit();
-//    SPIdevicesinit();
-//    InputInit();
-//    OutputInit();
-//    ModeSelectDelay.set =DELAY_250MS;
-//    delaymode();
-//    mode = MCP_pinRead(GIO_FUNCTION_SELECT_PIN);
-//    if(mode > 0){
-//        Fullautomaticled.set = DELAY_250MS;
-//        //fullAutomatic = true;
-//    }else{
-//        Semiautomaticled.set = DELAY_250MS;
-//        //semiAutomatic = false;
-//    }
-//
-//
-//    Calibrationbegin.set = 0;
-//    CalibrationFirstTemprorySettings.set = 0;
-//    CalibrationSecondTemprorySettings.set = 0;
-//    CalibrationFinalSettings.set = 0;
-//    EmergencyStopActive.set =0;
-//    CalibrationFailure.set = DELAY_250MS;
-//    ChipErase();
-//
-//
-//    adress_value[0] =  Read(0x000001);
-//    adress_value[1] =  Read(0x000002);
-//    adress_value[2] =  Read(0x000003);
-//    adress_value[3] =  Read(0x000004);
-//    adress_value[4] =  Read(0x000005);
-//    adress_value[5] =  Read(0x000006);
-//    adress_value[6] =  Read(0x000007);
-//    adress_value[7] =  Read(0x000008);
-//    adress_value[8] =  Read(0x000009);
-//    adress_value[9] =  Read(0x00000A);
-//    adress_value[10] =  Read(0x00000B);
-//    adress_value[11] =  Read(0x00000C);
-//    adress_value[12] =  Read(0x00000D);
+    HardwareInit();
+    SPIdevicesinit();
+    InputInit();
+    OutputInit();
+    ModeSelectDelay.set =DELAY_250MS;
+    delaymode();
+    mode = MCP_pinRead(GIO_FUNCTION_SELECT_PIN);
+    if(mode > 0){
+        Fullautomaticled.set = DELAY_250MS;
+        //fullAutomatic = true;
+    }else{
+        Semiautomaticled.set = DELAY_250MS;
+        //semiAutomatic = false;
+    }
 
 
-    canInit();
+    Calibrationbegin.set = 0;
+    CalibrationFirstTemprorySettings.set = 0;
+    CalibrationSecondTemprorySettings.set = 0;
+    CalibrationFinalSettings.set = 0;
+    EmergencyStopActive.set =0;
+    CalibrationFailure.set = DELAY_250MS;
+    ChipErase();
+
+
+    adress_value[0] =  Read(0x000001);
+    adress_value[1] =  Read(0x000002);
+    adress_value[2] =  Read(0x000003);
+    adress_value[3] =  Read(0x000004);
+    adress_value[4] =  Read(0x000005);
+    adress_value[5] =  Read(0x000006);
+    adress_value[6] =  Read(0x000007);
+    adress_value[7] =  Read(0x000008);
+    adress_value[8] =  Read(0x000009);
+    adress_value[9] =  Read(0x00000A);
+    adress_value[10] =  Read(0x00000B);
+    adress_value[11] =  Read(0x00000C);
+    adress_value[12] =  Read(0x00000D);
+
 
     while(1) /* ... continue forever */
     {
-        if(canIsRxMessageArrived(canREG1, canMESSAGE_BOX1)){
-            canGetData(canREG1, canMESSAGE_BOX1,can_rx_data);  /* receive on can2  */ //id 1
-        }
-//        modeWarning();
-//        canMessageCheck();
-//        MCUADCread();
-/////*****************************************************************************************************************************************************/
-/////******************************************************************************fullAutomaticmode*****************************************************/
+
+        modeWarning();
+        canMessageCheck();
+        MCUADCread();
+///*****************************************************************************************************************************************************/
+///******************************************************************************fullAutomaticmode*****************************************************/
+
+        if( Fullautomaticmode ){
+            if(systemActiveCheck()&& ISSCheck()!=true){
+                gioSetBit(GIO_OIL_PUMP_PORT, GIO_OIL_PUMP_PIN, HIGH);
+
+                if(full_Automatic_AutoAlignment){
+                    fullAutomaticAutoAlignmentProcess();
+                }
+                ControlLeds();
+                CommandCheck();
+                AllPowerSwitchSTatusGet();
+                pinStatusCheck(GIO_ALIGNMENT_VALF_LEFT_PIN_STATUS);     //left valf status
+                oilPumpStatusCheck(GIO_OIL_PUMP_PIN_STATUS);            //pump status
+            }else{
+                fullAutomaticStandBymode();
+            }//systemActiveCheck
+
+        }//Fullautomaticmode
 //
-//        if( Fullautomaticmode ){
-//            if(systemActiveCheck()&& ISSCheck()!=true){
-//                gioSetBit(GIO_OIL_PUMP_PORT, GIO_OIL_PUMP_PIN, HIGH);
-//
-//                if(full_Automatic_AutoAlignment){
-//                    fullAutomaticAutoAlignmentProcess();
-//                }
-//                ControlLeds();
-//                CommandCheck();
-//                AllPowerSwitchSTatusGet();
-//                pinStatusCheck(GIO_ALIGNMENT_VALF_LEFT_PIN_STATUS);     //left valf status
-//                oilPumpStatusCheck(GIO_OIL_PUMP_PIN_STATUS);            //pump status
-//            }else{
-//                fullAutomaticStandBymode();
-//            }//systemActiveCheck
-//
-//        }//Fullautomaticmode
-////
-///////****************************************************************************************************************************************************/
-///////******************************************************************************Semiautomaticmode*****************************************************/
-//
-//        if(Semiautomaticmode){
-//            if(systemActiveCheck()&& ISSCheck()!=true){
-//                gioSetBit(GIO_OIL_PUMP_PORT, GIO_OIL_PUMP_PIN, HIGH);
-//
-//                if( semi_Automatic_AutoAlignment ){
-//                    semiAutomaticAutoHizalamaProcess();
-//                }
-//                ControlLeds();
-//                CommandCheck();
-//                pinStatusCheck(GIO_ALIGNMENT_VALF_LEFT_PIN_STATUS);     //left valf status
-//                oilPumpStatusCheck(GIO_OIL_PUMP_PIN_STATUS);            //pump status
-//            }else{
-//                semiAutomaticStandByMode();
-//            }//systemActiveCheck
-//        }//Semiautomaticmode
+/////****************************************************************************************************************************************************/
+/////******************************************************************************Semiautomaticmode*****************************************************/
+
+        if(Semiautomaticmode){
+            if(systemActiveCheck()&& ISSCheck()!=true){
+                gioSetBit(GIO_OIL_PUMP_PORT, GIO_OIL_PUMP_PIN, HIGH);
+
+                if( semi_Automatic_AutoAlignment ){
+                    semiAutomaticAutoHizalamaProcess();
+                }
+                ControlLeds();
+                CommandCheck();
+                pinStatusCheck(GIO_ALIGNMENT_VALF_LEFT_PIN_STATUS);     //left valf status
+                oilPumpStatusCheck(GIO_OIL_PUMP_PIN_STATUS);            //pump status
+            }else{
+                semiAutomaticStandByMode();
+            }//systemActiveCheck
+        }//Semiautomaticmode
 
     }//while(1)
 }//main
