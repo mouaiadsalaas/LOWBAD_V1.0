@@ -123,7 +123,7 @@ void adcInit(void)
     adcREG1->GxMODECR[1U] = (uint32)ADC_8_BIT
                           | (uint32)0x00000020U
                           | (uint32)0x00000000U
-                          | (uint32)0x00000000U;
+                          | (uint32)0x00000002U;
 
     /** - Setup group 1 hardware trigger
      *     - Setup hardware trigger edge

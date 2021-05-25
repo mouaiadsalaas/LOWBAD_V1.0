@@ -84,6 +84,8 @@ bool right_aligment = false;
 bool set_aligment   = false;
 bool StopModeState  = false;
 
+bool StatusReady2Evaluate  = false;
+
 bool full_Automatic_AutoAlignment = false;
 bool full_Automatic_Set_Aligment  = false;
 
@@ -141,11 +143,13 @@ Timers BackSensorInoperative;
 
 Timers EmergencyStopActive;
 
+Timers StatusValueGet;
+
 typedef enum delays{
 
-    DELAY_250MS = 25,
-    DELAY_500MS = 50,
-    DELAY_1S = 100
+    DELAY_250MS = 250,
+    DELAY_500MS = 500,
+    DELAY_1S = 1000
 
 }Delays;
 
@@ -205,10 +209,8 @@ uint8 sensorLeft;
 uint16 *Dateinfo;
 
 //SST25PF040C
-uint16_t adress_value = 0;
-uint16_t adress_value2 = 0;
-uint16_t adress_value3 = 0;
-uint16_t adress_value4 = 0;
+uint16_t adress_value[100] = {0};
+
 
 //eeprom
 uint16 u16JobResult,Status;
@@ -236,12 +238,22 @@ float DegerSonuc =0;
 float AngleValue =0;
 
 int mode;
-uint16 GIO_OIL_PUMP_PIN_STATUS = 0 ;
-uint16 GIO_ALIGNMENT_VALF_LEFT_STATUS = 0 ;
+uint8_t GIO_OIL_PUMP_PIN_STATUS = 0 ;
+uint8_t GIO_STATUS_VALUE = 0 ;
+uint8_t mycounter = 0;
+uint8_t pump_mycounter = 0;
+uint32_t log_start_adress   = 0x000002;
+bool keep_log_flag = false;
+bool keep_log_open_counter = false;
+bool keep_log_normal_counter = false;
+bool keep_log_short_counter = false;
 
-uint32_t log_start_adress   = 0x000001;
-
-
+bool pump_keep_log_flag = false;
+bool pump_keep_log_open_counter = false;
+bool pump_keep_log_normal_counter = false;
+bool pump_keep_log_short_counter = false;
+bool check_flag = false;
+bool pump_check_again = true;
 void delay(void)
 {
     unsigned int dummycnt=0x0000FFU;
@@ -257,25 +269,36 @@ uint32 checkPackets(uint8 *src_packet,uint8 *dst_packet,uint32 psize);
 
 /*--------------------------------------------------------------------------RTIInit---------------------------------------------------------*/
 void RTIInit(){
-    rtiInit();
 
     rtiEnableNotification(rtiNOTIFICATION_COMPARE0);
-    //
-    //    rtiEnableNotification(rtiNOTIFICATION_COMPARE1);
-
     _enable_IRQ();
     rtiStartCounter(rtiCOUNTER_BLOCK0);
-    //    rtiStartCounter(rtiCOUNTER_BLOCK0);
 
+    rtiEnableNotification(rtiNOTIFICATION_COMPARE1);
+    _enable_IRQ();
+    rtiStartCounter(rtiCOUNTER_BLOCK0);
 }
 /*------------------------------------------------------------------------HardwareInit------------------------------------------------------*/
 void HardwareInit(){
-    hetInit();
+    rtiInit();
     gioInit();
+
+    //gioSetDirection(hetPORT1, 0xFFFFFFFF);
+
+    rtiEnableNotification(rtiNOTIFICATION_COMPARE0);
+    rtiStartCounter(rtiCOUNTER_BLOCK0);
+    //_enable_IRQ();
+
+
+    rtiEnableNotification(rtiNOTIFICATION_COMPARE1);
+    rtiStartCounter(rtiCOUNTER_BLOCK1);
+    _enable_IRQ();
+
+
+    hetInit();
     adcInit();
     spiInit();
     canInit();
-    RTIInit();
 }
 /*------------------------------------------------------------------------SPIMCPInit--------------------------------------------------------*/
 void SPIMCPInit(){
@@ -382,16 +405,17 @@ void AllPowerSwitchSTatusGet(){
     Right4PowerSwitchStatusGet();
     Left2PowerSwitchStatusGet();
     Right2PowerSwitchStatusGet();
+    Bottom1PowerSwitchStatusGet();
 }
 /*-----------------------------------------------------------------------MCUADCread-------------------------------------------------------------*/
 void MCUADCread(){
     adcStartConversion(adcREG1,adcGROUP1);
-    while((adcIsConversionComplete(adcREG1,adcGROUP1))==0);
-    //while((adcIsConversionComplete(adcREG1,adcGROUP1))!=0){
+    //while((adcIsConversionComplete(adcREG1,adcGROUP1))==0);
+    if((adcIsConversionComplete(adcREG1,adcGROUP1))!=0){
         ch_count = adcGetData(adcREG1, adcGROUP1,&adc_data[0]);
         ch_count = ch_count;
         adcStopConversion(adcREG1,adcGROUP1);
-   // }
+    }
 
 }
 /*------------------------------------------------------------------------InputInit--------------------------------------------------------------*/
@@ -414,6 +438,21 @@ void ValueToAngle ( int Home , int KatSayi , int Sensor ){
 void HedefAci ( float Aci){
     AngleValue = 41 * sin(Aci/68);
 }
+
+void logKeep(uint16 output_channel ,uint16 error_code){
+    Write(log_start_adress,output_channel);
+    log_start_adress++;
+    Write(log_start_adress,error_code);
+    log_start_adress++;
+
+}
+//we can just use this function after pressing the button of its output other wise
+//if there is no input there is no output and status can be undefined
+void AlignmentValfLeftStatusGet(){
+
+
+}
+
 /*-------------------------------------------------------------------------epromWrite--------------------------------------------------------------*/
 void epromWrite(unsigned int Block_NO,uint8 eeprom_Data[16] ){
 
@@ -788,9 +827,12 @@ void commandButtonscheck(){
 
             aligment_buf = set_bit(aligment_buf, 1, 1);
             left_aligment = true;
+            check_flag = true;
         }else{
             aligment_buf = set_bit(aligment_buf, 1, 0);
             left_aligment = false;
+            check_flag = false ;
+
         }
     }//AlignmentLeft
 /************************************************************************* Auto mode button bottun pressed***/
@@ -1068,7 +1110,6 @@ void ControlLeds(){
     if(tick){
         tick=false;
 /***********************************************************************incommon leds****************************************************************************************/
-
 /***********************************************************************EmergencyStopActive****/
         if(EmergencyStopActive.set != 0){
             if(++EmergencyStopActive.count >= EmergencyStopActive.set){
@@ -1545,134 +1586,170 @@ void delaymode(){
     }
 }
 
-void oilPumpStatusGet(){
-    GIO_OIL_PUMP_PIN_STATUS = VNQ5050KTRE_LEFT_1CS2_VAL;
-    if(GIO_OIL_PUMP_PIN_STATUS > 10 && GIO_OIL_PUMP_PIN_STATUS< 3900 ){
-        //printf("oil pump Normal stuation");
-        //i used GIO_PUMP_PORT this here because i had no one else to use
-        //but do not forget to change it and to set flash functions instead
-        gioSetBit(GIO_PUMP_PORT, GIO_PUMP_PIN, LOW);
+void pinStatusCheck(uint8_t pin2check){
 
-    }else if (GIO_OIL_PUMP_PIN_STATUS < 10){
-        //printf("oil pump not connected (openload)");
-        gioSetBit(GIO_PUMP_PORT, GIO_PUMP_PIN, HIGH);
+    if(check_flag == true){
+        if(pin2check == GIO_ALIGNMENT_VALF_LEFT_PIN_STATUS){
+            GIO_STATUS_VALUE =VN5T006ASPTRE_BOTTOM_CS1_VAL;
+        }
 
+        if((GIO_STATUS_VALUE >8 && GIO_STATUS_VALUE <250)){
+            keep_log_short_counter  = false;
+            keep_log_open_counter   = false;
+            keep_log_normal_counter = true;
+        }else if((GIO_STATUS_VALUE <8)){
+              keep_log_open_counter   = true;
+              keep_log_normal_counter = false;
+              keep_log_short_counter  = false;
+          }else if((GIO_STATUS_VALUE >250)){
+              keep_log_short_counter  = true;
+              keep_log_open_counter   = false;
+              keep_log_normal_counter = false;
+          }
     }else{
-        //printf("oil pump short circuit");
-        gioSetBit(GIO_PUMP_PORT, GIO_PUMP_PIN, HIGH);
-
+        if(keep_log_open_counter || keep_log_short_counter){
+            keep_log_flag = true;
+            if(keep_log_flag){
+                mycounter = mycounter + 1;
+                logKeep(GIO_ALIGNMENT_VALF_LEFT_PIN_STATUS, GIO_OPEN_ERROR);
+                keep_log_flag = false;
+                keep_log_open_counter  = false;
+                keep_log_short_counter = false;
+            }
+        }
     }
 }
 
-//we can just use this function after pressing the button of its output other wise
-//if there is no input there is no output and status can be undefined
-void AlignmentValfLeftStatusGet(){
-    Bottom1PowerSwitchStatusGet();
-    gioSetBit(GIO_ALIGNMENT_VALF_LEFT_PORT, GIO_ALIGNMENT_VALF_LEFT_PIN, HIGH);
-    GIO_ALIGNMENT_VALF_LEFT_STATUS = VN5T006ASPTRE_BOTTOM_CS1_VAL;
-    if(GIO_ALIGNMENT_VALF_LEFT_STATUS > 150 && GIO_ALIGNMENT_VALF_LEFT_STATUS< 3900 ){
-        //printf("oil pump Normal stuation");
-        //i used GIO_PUMP_PORT this here because i had no one else to use
-        //but do not forget to change it and to set flash functions instead
-        gioSetBit(GIO_PUMP_PORT, GIO_PUMP_PIN, LOW);
-        //ChipErase();
+void oilPumpStatusCheck(uint8_t pin2check){
 
+        if(pin2check == GIO_OIL_PUMP_PIN_STATUS){
+            GIO_STATUS_VALUE =VNQ5050KTRE_LEFT_1CS2_VAL;
+        }
 
-    }else if (GIO_OIL_PUMP_PIN_STATUS < 150){
-        //printf("oil pump not connected (openload)");
-        gioSetBit(GIO_PUMP_PORT, GIO_PUMP_PIN, HIGH);
+        if((GIO_STATUS_VALUE >2 && GIO_STATUS_VALUE <250)){
+            pump_keep_log_short_counter  = false;
+            pump_keep_log_open_counter   = false;
+            pump_keep_log_normal_counter = true;
+            pump_check_again = true;
+        }else if((GIO_STATUS_VALUE <8)){
+              pump_keep_log_open_counter   = true;
+              pump_keep_log_normal_counter = false;
+              pump_keep_log_short_counter  = false;
 
-    }else{
-        //printf("oil pump short circuit");
-        gioSetBit(GIO_PUMP_PORT, GIO_PUMP_PIN, HIGH);
+          }else if((GIO_STATUS_VALUE >250)){
+              pump_keep_log_short_counter  = true;
+              pump_keep_log_open_counter   = false;
+              pump_keep_log_normal_counter = false;
+          }
 
-    }
+        if(pump_check_again){
+            if(pump_keep_log_open_counter || pump_keep_log_short_counter){
+                pump_keep_log_flag = true;
+                if(pump_keep_log_flag){
+                    pump_mycounter = pump_mycounter + 1;
+                    logKeep(GIO_PUMP_PIN_STATUS, GIO_OPEN_ERROR);
+                    pump_keep_log_flag = false;
+                    pump_keep_log_open_counter  = false;
+                    pump_keep_log_short_counter = false;
+                    pump_check_again = false;
+
+                }
+            }
+        }
+
 }
 
-void logKeep(uint16 output_channel ,uint16 error_code){
-    Write(log_start_adress,output_channel);
-    log_start_adress++;
-    Write(log_start_adress,error_code);
-    log_start_adress++;
-
-}
 void main(void)
 {
-    HardwareInit();
-    SPIdevicesinit();
-    InputInit();
-    OutputInit();
-    ModeSelectDelay.set =DELAY_250MS;
-    delaymode();
-    mode = MCP_pinRead(GIO_FUNCTION_SELECT_PIN);
-    if(mode > 0){
-        Fullautomaticled.set = DELAY_250MS;
-        //fullAutomatic = true;
-    }else{
-        Semiautomaticled.set = DELAY_250MS;
-        //semiAutomatic = false;
-    }
+//    HardwareInit();
+//    SPIdevicesinit();
+//    InputInit();
+//    OutputInit();
+//    ModeSelectDelay.set =DELAY_250MS;
+//    delaymode();
+//    mode = MCP_pinRead(GIO_FUNCTION_SELECT_PIN);
+//    if(mode > 0){
+//        Fullautomaticled.set = DELAY_250MS;
+//        //fullAutomatic = true;
+//    }else{
+//        Semiautomaticled.set = DELAY_250MS;
+//        //semiAutomatic = false;
+//    }
+//
+//
+//    Calibrationbegin.set = 0;
+//    CalibrationFirstTemprorySettings.set = 0;
+//    CalibrationSecondTemprorySettings.set = 0;
+//    CalibrationFinalSettings.set = 0;
+//    EmergencyStopActive.set =0;
+//    CalibrationFailure.set = DELAY_250MS;
+//    ChipErase();
+//
+//
+//    adress_value[0] =  Read(0x000001);
+//    adress_value[1] =  Read(0x000002);
+//    adress_value[2] =  Read(0x000003);
+//    adress_value[3] =  Read(0x000004);
+//    adress_value[4] =  Read(0x000005);
+//    adress_value[5] =  Read(0x000006);
+//    adress_value[6] =  Read(0x000007);
+//    adress_value[7] =  Read(0x000008);
+//    adress_value[8] =  Read(0x000009);
+//    adress_value[9] =  Read(0x00000A);
+//    adress_value[10] =  Read(0x00000B);
+//    adress_value[11] =  Read(0x00000C);
+//    adress_value[12] =  Read(0x00000D);
 
 
-    Calibrationbegin.set = 0;
-    CalibrationFirstTemprorySettings.set = 0;
-    CalibrationSecondTemprorySettings.set = 0;
-    CalibrationFinalSettings.set = 0;
-    EmergencyStopActive.set =0;
-    CalibrationFailure.set = DELAY_250MS;
-    ChipErase();
-
-    logKeep(0x02, 0x01);
-    logKeep(0x03, 0x01);
-
-    adress_value =  Read(0x000001);
-    adress_value2 = Read(0x000002);
-    adress_value3 = Read(0x000003);
-    adress_value4 = Read(0x000004);
+    canInit();
 
     while(1) /* ... continue forever */
     {
-
-        modeWarning();
-        MCUADCread();
-        AllPowerSwitchSTatusGet();
-
-/*****************************************************************************************************************************************************/
-/******************************************************************************fullAutomaticmode*****************************************************/
-
-        if( Fullautomaticmode ){
-            if(systemActiveCheck()&& ISSCheck()!=true){
-                gioSetBit(GIO_OIL_PUMP_PORT, GIO_OIL_PUMP_PIN, HIGH);
-
-                if(full_Automatic_AutoAlignment){
-                    fullAutomaticAutoAlignmentProcess();
-                }
-                ControlLeds();
-                CommandCheck();
-
-            }else{
-                fullAutomaticStandBymode();
-            }//systemActiveCheck
-
-        }//Fullautomaticmode
-
-/****************************************************************************************************************************************************/
-/******************************************************************************Semiautomaticmode*****************************************************/
-
-        if(Semiautomaticmode){
-            if(systemActiveCheck()&& ISSCheck()!=true){
-                gioSetBit(GIO_OIL_PUMP_PORT, GIO_OIL_PUMP_PIN, HIGH);
-
-                if( semi_Automatic_AutoAlignment ){
-                    semiAutomaticAutoHizalamaProcess();
-                }
-                ControlLeds();
-                CommandCheck();
-
-            }else{
-                semiAutomaticStandByMode();
-            }//systemActiveCheck
-        }//Semiautomaticmode
+        if(canIsRxMessageArrived(canREG1, canMESSAGE_BOX1)){
+            canGetData(canREG1, canMESSAGE_BOX1,can_rx_data);  /* receive on can2  */ //id 1
+        }
+//        modeWarning();
+//        canMessageCheck();
+//        MCUADCread();
+/////*****************************************************************************************************************************************************/
+/////******************************************************************************fullAutomaticmode*****************************************************/
+//
+//        if( Fullautomaticmode ){
+//            if(systemActiveCheck()&& ISSCheck()!=true){
+//                gioSetBit(GIO_OIL_PUMP_PORT, GIO_OIL_PUMP_PIN, HIGH);
+//
+//                if(full_Automatic_AutoAlignment){
+//                    fullAutomaticAutoAlignmentProcess();
+//                }
+//                ControlLeds();
+//                CommandCheck();
+//                AllPowerSwitchSTatusGet();
+//                pinStatusCheck(GIO_ALIGNMENT_VALF_LEFT_PIN_STATUS);     //left valf status
+//                oilPumpStatusCheck(GIO_OIL_PUMP_PIN_STATUS);            //pump status
+//            }else{
+//                fullAutomaticStandBymode();
+//            }//systemActiveCheck
+//
+//        }//Fullautomaticmode
+////
+///////****************************************************************************************************************************************************/
+///////******************************************************************************Semiautomaticmode*****************************************************/
+//
+//        if(Semiautomaticmode){
+//            if(systemActiveCheck()&& ISSCheck()!=true){
+//                gioSetBit(GIO_OIL_PUMP_PORT, GIO_OIL_PUMP_PIN, HIGH);
+//
+//                if( semi_Automatic_AutoAlignment ){
+//                    semiAutomaticAutoHizalamaProcess();
+//                }
+//                ControlLeds();
+//                CommandCheck();
+//                pinStatusCheck(GIO_ALIGNMENT_VALF_LEFT_PIN_STATUS);     //left valf status
+//                oilPumpStatusCheck(GIO_OIL_PUMP_PIN_STATUS);            //pump status
+//            }else{
+//                semiAutomaticStandByMode();
+//            }//systemActiveCheck
+//        }//Semiautomaticmode
 
     }//while(1)
 }//main
@@ -1682,11 +1759,17 @@ void main(void)
 /****************************************************************************************************************************************************/
 void rtiNotification(uint32 notification)
 {
-        global_counter++;
+    if(notification ==rtiNOTIFICATION_COMPARE0){
         tick=true;
-        canMessageCheck();
+    }
+    if(notification ==rtiNOTIFICATION_COMPARE1){
+        global_counter++;
+        //tick=true;
+
         getSensorAndCamelNeckValue();
+    }
 }
+
 
 
 uint32 checkPackets(uint8 *src_packet,uint8 *dst_packet,uint32 psize)

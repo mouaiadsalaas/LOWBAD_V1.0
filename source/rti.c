@@ -87,7 +87,7 @@ void rtiInit(void)
     rtiREG1->CAPCTRL = 0U | 0U;
 
     /** - Setup input source compare 0-3 */
-    rtiREG1->COMPCTRL = 0x00001000U | 0x00000100U | 0x00000000U | 0x00000000U;
+    rtiREG1->COMPCTRL = 0x00001000U | 0x00000100U | 0x00000010U | 0x00000000U;
 
     /** - Reset up counter 0 */
     rtiREG1->CNT[0U].UCx = 0x00000000U;
@@ -114,16 +114,16 @@ void rtiInit(void)
     rtiREG1->CNT[1U].CPUCx = 7U;
 
     /** - Setup compare 0 value. This value is compared with selected free running counter. */
-    rtiREG1->CMP[0U].COMPx = 100000U;
+    rtiREG1->CMP[0U].COMPx = 10000U;
 
     /** - Setup update compare 0 value. This value is added to the compare 0 value on each compare match. */
-    rtiREG1->CMP[0U].UDCPx = 100000U;
+    rtiREG1->CMP[0U].UDCPx = 10000U;
 
     /** - Setup compare 1 value. This value is compared with selected free running counter. */
-    rtiREG1->CMP[1U].COMPx = 500000U;
+    rtiREG1->CMP[1U].COMPx = 10000U;
 
     /** - Setup update compare 1 value. This value is added to the compare 1 value on each compare match. */
-    rtiREG1->CMP[1U].UDCPx = 500000U;
+    rtiREG1->CMP[1U].UDCPx = 10000U;
 
     /** - Setup compare 2 value. This value is compared with selected free running counter. */
     rtiREG1->CMP[2U].COMPx = 80000U;
