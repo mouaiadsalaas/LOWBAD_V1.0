@@ -531,12 +531,16 @@ void eepromRead(unsigned int Block_NO,uint8 eeprom_Data_RX[16]){
 void CanYellowHighLow ( bool state ){
 
     if( state ){
-        gioSetBit(GIO_ALIGNMENT_WARNING_LAMP_RED_PORT,GIO_ALIGNMENT_WARNING_LAMP_RED_PIN ,HIGH);//yellow
+        gioSetBit(GIO_ALIGNMENT_WARNING_LAMP_RED_PORT,GIO_ALIGNMENT_WARNING_LAMP_YELLOW_PIN ,HIGH);//red
         can_tx_data[0] = (255) & 0xFF;
+        canTransmit(canREG1, canMESSAGE_BOX2, can_tx_data);//id = 4
+
 
     }else{
-        gioSetBit(GIO_ALIGNMENT_WARNING_LAMP_RED_PORT,GIO_ALIGNMENT_WARNING_LAMP_RED_PIN ,LOW);//yellow
+        gioSetBit(GIO_ALIGNMENT_WARNING_LAMP_RED_PORT,GIO_ALIGNMENT_WARNING_LAMP_YELLOW_PIN ,LOW);//red
         can_tx_data[0] = (0) & 0xFF;
+        canTransmit(canREG1, canMESSAGE_BOX2, can_tx_data);//id = 4
+
 
     }
 }
@@ -546,9 +550,13 @@ void CanRedHighLow ( bool state ){
     if( state ){
         gioSetBit(GIO_ALIGNMENT_WARNING_LAMP_RED_PORT,GIO_ALIGNMENT_WARNING_LAMP_RED_PIN ,HIGH);
         can_tx_data[1] = (255) & 0xFF;
+        canTransmit(canREG1, canMESSAGE_BOX2, can_tx_data);
+
     }else{
         gioSetBit(GIO_ALIGNMENT_WARNING_LAMP_RED_PORT,GIO_ALIGNMENT_WARNING_LAMP_RED_PIN ,LOW);
         can_tx_data[1] = (0) & 0xFF;
+        canTransmit(canREG1, canMESSAGE_BOX2, can_tx_data);
+
     }
 }
 /*--------------------------------------------------------------------------canMessageCheck----------------------------------------------------------*/
@@ -600,9 +608,9 @@ void canMessageCheck(){
 
         canSensorData = can_rx_data[0];
         canSensorData <<= 8;
-        canSensorData |= can_rx_data[1];
-//        canSensorData = (ADS1018Data[2]-1000);
-//        PumpSlaveBtn =  can_rx_data[2];
+        canSensorData |=  can_rx_data[1];
+        PumpSlaveBtn   =  can_rx_data[2];
+
 
         if( CalibrationDone == true){
 
@@ -761,11 +769,15 @@ void fullAutomaticPumpCheck(){
 
         if ( PumpSlaveBtn ){ //Button Push UP
              gioSetBit(GIO_PUMP_PORT, GIO_PUMP_PIN , HIGH);
+             can_tx_data[4] = 1;
+             canTransmit(canREG1, canMESSAGE_BOX2, can_tx_data);
              PumpState = true;
 
          }else{
              if( PumpState == true){
                  gioSetBit(GIO_PUMP_PORT, GIO_PUMP_PIN , LOW);
+                 can_tx_data[4] = 0;
+                 canTransmit(canREG1, canMESSAGE_BOX2, can_tx_data);
                  PumpState = false;
              }
          }//PumpSlaveBtn
@@ -867,17 +879,42 @@ void commandButtonscheck(){
         if ((StopMode = MCP_pinRead(GIO_STOP_BTN_PIN)) ){
             aligment_buf = set_bit(aligment_buf, 4, 1);
             emergency_stop = true;
+            gioSetBit(GIO_ALIGNMENT_VALF_LEFT_PORT,GIO_ALIGNMENT_VALF_LEFT_PIN ,LOW);//red
+            gioSetBit(GIO_ALIGNMENT_VALF_RIGHT_PORT,GIO_ALIGNMENT_VALF_RIGHT_PIN ,LOW);//red
+            gioSetBit(GIO_PUMP_PORT,GIO_PUMP_PIN ,LOW);//red
+            //gioSetBit(GIO_OIL_PUMP_PORT,GIO_OIL_PUMP_PIN ,LOW);//red
 
-            gioSetBit(GIO_ALIGNMENT_VALF_LEFT_PORT,GIO_ALIGNMENT_VALF_LEFT_PIN ,LOW);
-            gioSetBit(GIO_ALIGNMENT_VALF_RIGHT_PORT,GIO_ALIGNMENT_VALF_RIGHT_PIN ,LOW);
-            gioSetBit(GIO_PUMP_PORT,GIO_PUMP_PIN ,LOW);
+
+            full_Automatic_AutoAlignment = false;
+            full_Automatic_Set_Aligment  = false;
+
+            Calibrationbegin.set = 0;
+            CalibrationFirstTemprorySettings.set = 0;
+            CalibrationSecondTemprorySettings.set = 0;
+            CalibrationFinalSettings.set = 0;
+            CalibrationCancel.set = 0;
+
+            set_aligment = false;
+            aligment_set_level = 0 ;
+
+            FrontSensorInoperative.set = 0;
+            BackSensorInoperative.set = 0;
+            FifthWheelAnglePositioneLeft.set = 0;
+            FifthWheelAnglePositioneRight.set = 0;
+            VehicleInRoute.set = 0;
+
+            AutomaticAligmentDone.set = 0;
+            ISSSingalActive.set = 0;
+
+            aligment_set_level = 0;
+            EmergencyStopActive.set = DELAY_250MS;
         }else{
             aligment_buf = set_bit(aligment_buf, 4, 0);
             emergency_stop = false;
             EmergencyStopActive.set = 0;
             CalibrationFailure.set = DELAY_250MS;
-            gioSetBit(GIO_ALIGNMENT_WARNING_LAMP_RED_PORT,GIO_ALIGNMENT_WARNING_LAMP_RED_PIN ,LOW);//red
-            gioSetBit(GIO_ALIGNMENT_WARNING_LAMP_YELLOW_PORT,GIO_ALIGNMENT_WARNING_LAMP_YELLOW_PIN ,LOW);//yellow
+            CanYellowHighLow(false);
+            CanRedHighLow(false);
 
         }
     }//StopMode
@@ -907,8 +944,8 @@ void fullAutomaticAligmentCommandsCheck(){
                     setAligmentProcess();
                     //CalibrationSecondTemprorySettings.set = DELAY_1S;//need to edit accord the documents
                     CalibrationFirstTemprorySettings.set = 0;
-                    gioSetBit(GIO_ALIGNMENT_WARNING_LAMP_RED_PORT,GIO_ALIGNMENT_WARNING_LAMP_YELLOW_PIN ,HIGH);//red
-                    gioSetBit(GIO_ALIGNMENT_WARNING_LAMP_RED_PORT,GIO_ALIGNMENT_WARNING_LAMP_RED_PIN ,HIGH);//red
+                    CanYellowHighLow(true);
+                    CanRedHighLow(true);
                 }else{
                     if(full_Automatic_AutoAlignment == false){
                         gioSetBit(GIO_ALIGNMENT_VALF_RIGHT_PORT, GIO_ALIGNMENT_VALF_RIGHT_PIN, HIGH);
@@ -927,8 +964,8 @@ void fullAutomaticAligmentCommandsCheck(){
                     //CalibrationSecondTemprorySettings.set = DELAY_1S;//need to edit accord the documents
 
                     CalibrationFirstTemprorySettings.set = 0;
-                    gioSetBit(GIO_ALIGNMENT_WARNING_LAMP_RED_PORT,GIO_ALIGNMENT_WARNING_LAMP_YELLOW_PIN ,HIGH);//red
-                    gioSetBit(GIO_ALIGNMENT_WARNING_LAMP_RED_PORT,GIO_ALIGNMENT_WARNING_LAMP_RED_PIN ,HIGH);//red
+                    CanYellowHighLow(true);
+                    CanRedHighLow(true);
 
                 }else{
                     if(full_Automatic_AutoAlignment == false){
@@ -953,7 +990,7 @@ void fullAutomaticAligmentCommandsCheck(){
                         CamelneckHomeTemporary = AttractiveLeftSensorAndCamelNeck;  //from ads1018[2]
                         FifthWheelHomeTemporary = canSensorData;   //from canbus
                         //printf("yellow lamp on keep\n");
-                        gioSetBit(GIO_ALIGNMENT_WARNING_LAMP_RED_PORT,GIO_ALIGNMENT_WARNING_LAMP_YELLOW_PIN ,HIGH);//red
+                        CanYellowHighLow(true);
                         CalibrationFirstTemprorySettings.set = DELAY_500MS;
                         aligment_set_level = 1;
                     }
@@ -1036,8 +1073,8 @@ void fullAutomaticAligmentCommandsCheck(){
 
                     aligment_set_level = 0;
                     //printf("yellow and red lamp off\n");
-                    gioSetBit(GIO_ALIGNMENT_WARNING_LAMP_RED_PORT,GIO_ALIGNMENT_WARNING_LAMP_YELLOW_PIN ,LOW);//red
-                    gioSetBit(GIO_ALIGNMENT_WARNING_LAMP_RED_PORT,GIO_ALIGNMENT_WARNING_LAMP_RED_PIN ,LOW);//red
+                    CanYellowHighLow(false);
+                    CanRedHighLow(false);
                     CalibrationFinalSettings.set = DELAY_250MS;
                 }
 
@@ -1080,7 +1117,7 @@ void fullAutomaticAligmentCommandsCheck(){
             break;
 /***********************************************************************Others process***/
         default:
-            if(full_Automatic_AutoAlignment == false){
+            if(full_Automatic_AutoAlignment == false && emergency_stop == false){
                 gioSetBit(GIO_ALIGNMENT_VALF_RIGHT_PORT, GIO_ALIGNMENT_VALF_RIGHT_PIN, LOW);
                 gioSetBit(GIO_ALIGNMENT_VALF_LEFT_PORT, GIO_ALIGNMENT_VALF_LEFT_PIN, LOW);
                 gioSetBit(GIO_PUMP_PORT, GIO_PUMP_PIN, LOW);
@@ -1098,6 +1135,36 @@ void fullAutomaticAligmentCommandsCheck(){
                 AutomaticAligmentDone.set = 0;
                 FrontSensorInoperative.set = 0;
                 BackSensorInoperative.set = 0;
+            }else if(emergency_stop == true){
+                gioSetBit(GIO_ALIGNMENT_VALF_LEFT_PORT,GIO_ALIGNMENT_VALF_LEFT_PIN ,LOW);//red
+                gioSetBit(GIO_ALIGNMENT_VALF_RIGHT_PORT,GIO_ALIGNMENT_VALF_RIGHT_PIN ,LOW);//red
+                gioSetBit(GIO_PUMP_PORT,GIO_PUMP_PIN ,LOW);//red
+                //gioSetBit(GIO_OIL_PUMP_PORT,GIO_OIL_PUMP_PIN ,LOW);//red
+
+
+                full_Automatic_AutoAlignment = false;
+                full_Automatic_Set_Aligment  = false;
+
+                Calibrationbegin.set = 0;
+                CalibrationFirstTemprorySettings.set = 0;
+                CalibrationSecondTemprorySettings.set = 0;
+                CalibrationFinalSettings.set = 0;
+                CalibrationCancel.set = 0;
+
+                set_aligment = false;
+                aligment_set_level = 0 ;
+
+                FrontSensorInoperative.set = 0;
+                BackSensorInoperative.set = 0;
+                FifthWheelAnglePositioneLeft.set = 0;
+                FifthWheelAnglePositioneRight.set = 0;
+                VehicleInRoute.set = 0;
+
+                AutomaticAligmentDone.set = 0;
+                ISSSingalActive.set = 0;
+
+                aligment_set_level = 0;
+                EmergencyStopActive.set = DELAY_250MS;
             }
             break;
 
@@ -1118,20 +1185,22 @@ void ControlLeds(){
 
                if(EmergencyStopActive.state){
                    //printf("yellow and red lamp on x1 for 250ms\n");
-                   gioSetBit(GIO_ALIGNMENT_WARNING_LAMP_RED_PORT,GIO_ALIGNMENT_WARNING_LAMP_RED_PIN ,HIGH);//red
-                   gioSetBit(GIO_ALIGNMENT_WARNING_LAMP_RED_PORT,GIO_ALIGNMENT_WARNING_LAMP_YELLOW_PIN ,LOW);//red
+                   CanRedHighLow(true);
+                   CanYellowHighLow(false);
+
                    EmergencyStopActive.counter++;
                }else{
                    //printf("yellow and red lamp off x1 for 250ms\n");
-                   gioSetBit(GIO_ALIGNMENT_WARNING_LAMP_RED_PORT,GIO_ALIGNMENT_WARNING_LAMP_RED_PIN ,LOW);//red
-                   gioSetBit(GIO_ALIGNMENT_WARNING_LAMP_RED_PORT,GIO_ALIGNMENT_WARNING_LAMP_YELLOW_PIN ,HIGH);//red
-
+                   CanYellowHighLow(true);
+                   CanRedHighLow(false);
                    if(EmergencyStopActive.counter>=1){
                        EmergencyStopActive.set = 0;
                        EmergencyStopActive.counter = 0;
                        CalibrationFailure.set = DELAY_250MS;
                    }
                }
+               canTransmit(canREG1, canMESSAGE_BOX2, can_tx_data);
+
            }//EmergencyStopActive
         }//EmergencyStopActive
 /***************************************************************************AutomaticAligmentDone*****/
@@ -1143,19 +1212,26 @@ void ControlLeds(){
 
                if(AutomaticAligmentDone.state){
                    //printf("yellow and red lamp on 250 x2\n");
-                   gioSetBit(GIO_ALIGNMENT_WARNING_LAMP_RED_PORT,GIO_ALIGNMENT_WARNING_LAMP_RED_PIN ,HIGH);//red
-                   gioSetBit(GIO_ALIGNMENT_WARNING_LAMP_YELLOW_PORT,GIO_ALIGNMENT_WARNING_LAMP_YELLOW_PIN ,HIGH);//yellow
+                   CanRedHighLow(true);
+                   CanYellowHighLow(true);
                    AutomaticAligmentDone.counter++;
+                   canTransmit(canREG1, canMESSAGE_BOX2, can_tx_data);
+
                }else{
                    //printf("yellow and red lamp off 250 x2\n");
-                   gioSetBit(GIO_ALIGNMENT_WARNING_LAMP_RED_PORT,GIO_ALIGNMENT_WARNING_LAMP_RED_PIN ,LOW);//red
-                   gioSetBit(GIO_ALIGNMENT_WARNING_LAMP_YELLOW_PORT,GIO_ALIGNMENT_WARNING_LAMP_YELLOW_PIN ,LOW);//yellow
+                   canTransmit(canREG1, canMESSAGE_BOX2, can_tx_data);
+
+                   CanRedHighLow(false);
+                   CanYellowHighLow(false);
                    if(AutomaticAligmentDone.counter>=2){
                        AutomaticAligmentDone.set = 0;
                        AutomaticAligmentDone.counter = 0;
+                       canTransmit(canREG1, canMESSAGE_BOX2, can_tx_data);
 
                    }
                }
+               canTransmit(canREG1, canMESSAGE_BOX2, can_tx_data);
+
             }
         }//AutomaticAligmentDone
 /***********************************************************************just full auto leds**********************************************************************************/
@@ -1188,6 +1264,8 @@ void ControlLeds(){
                         CanYellowHighLow(false);
                         CanRedHighLow(false);
                     }
+                    canTransmit(canREG1, canMESSAGE_BOX2, can_tx_data);
+
                 }
             }//FrontSensorInoperative
 /*******************************************************************BackSensorInoperative*****/
@@ -1218,6 +1296,8 @@ void ControlLeds(){
                         CanYellowHighLow(false);
                         CanRedHighLow(false);
                     }
+                    canTransmit(canREG1, canMESSAGE_BOX2, can_tx_data);
+
                 }
             }//BackSensorInoperative
 /*************************************************************************Calibrationbegin*****/
@@ -1229,15 +1309,16 @@ void ControlLeds(){
 
                    if(Calibrationbegin.state){
                        //printf("yellow and red lamp on x1 for 500ms\n");
-                       gioSetBit(GIO_ALIGNMENT_WARNING_LAMP_RED_PORT,GIO_ALIGNMENT_WARNING_LAMP_RED_PIN ,HIGH);//red
-                       gioSetBit(GIO_ALIGNMENT_WARNING_LAMP_RED_PORT,GIO_ALIGNMENT_WARNING_LAMP_YELLOW_PIN ,HIGH);//yellow
+                       CanRedHighLow(true);
+                       CanYellowHighLow(true);
                        Calibrationbegin.counter++;
                    }else{
                        //printf("yellow and red lamp off x1 for 500ms\n");
-                       gioSetBit(GIO_ALIGNMENT_WARNING_LAMP_RED_PORT,GIO_ALIGNMENT_WARNING_LAMP_RED_PIN ,LOW);//red
-                       gioSetBit(GIO_ALIGNMENT_WARNING_LAMP_RED_PORT,GIO_ALIGNMENT_WARNING_LAMP_YELLOW_PIN ,LOW);//yellow
-
+                       CanRedHighLow(false);
+                       CanYellowHighLow(false);
                    }
+                   canTransmit(canREG1, canMESSAGE_BOX2, can_tx_data);
+
                }
            }//Calibrationbegin
 /***********************************************************CalibrationFirstTemprorySettings****/
@@ -1248,16 +1329,18 @@ void ControlLeds(){
                     CalibrationFirstTemprorySettings.count = 0;
 
                    if(CalibrationFirstTemprorySettings.state){
-                       gioSetBit(GIO_ALIGNMENT_WARNING_LAMP_RED_PORT,GIO_ALIGNMENT_WARNING_LAMP_RED_PIN ,HIGH);//red
+                       CanRedHighLow(true);
                    }else{
                        //red lamp off x1 for 250ms
                        //printf("red lamp off x1 for 500ms and yellow keep\n");
-                       gioSetBit(GIO_ALIGNMENT_WARNING_LAMP_RED_PORT,GIO_ALIGNMENT_WARNING_LAMP_RED_PIN ,LOW);//red
+                       CanRedHighLow(false);
     //                   if(CalibrationFirstTemprorySettings.counter>=1){
     //                       CalibrationFirstTemprorySettings.set = 0;
     //                       CalibrationFirstTemprorySettings.counter = 0;
     //                   }
                    }
+                   canTransmit(canREG1, canMESSAGE_BOX2, can_tx_data);
+
                }
            }//CalibrationFirstTemprorySettings
 /***********************************************************CalibrationSecondTemprorySettings****/
@@ -1276,6 +1359,8 @@ void ControlLeds(){
                            CalibrationSecondTemprorySettings.counter = 0;
                        }
                    }
+                   canTransmit(canREG1, canMESSAGE_BOX2, can_tx_data);
+
                }
            }//CalibrationSecondTemprorySettings
 /*******************************************************************CalibrationFinalSettings*****/
@@ -1288,14 +1373,13 @@ void ControlLeds(){
 
                    if(CalibrationFinalSettings.state){
                        //printf("yellow and red lamp on 250 x3\n");
-                       gioSetBit(GIO_ALIGNMENT_WARNING_LAMP_RED_PORT,GIO_ALIGNMENT_WARNING_LAMP_RED_PIN ,HIGH);//red
-                       gioSetBit(GIO_ALIGNMENT_WARNING_LAMP_RED_PORT,GIO_ALIGNMENT_WARNING_LAMP_YELLOW_PIN ,HIGH);//yellow
-
+                       CanRedHighLow(true);
+                       CanYellowHighLow(true);
                        CalibrationFinalSettings.counter++;
                    }else{
                        //printf("yellow and red lamp off 250 x3\n");
-                       gioSetBit(GIO_ALIGNMENT_WARNING_LAMP_RED_PORT,GIO_ALIGNMENT_WARNING_LAMP_RED_PIN ,LOW);//red
-                       gioSetBit(GIO_ALIGNMENT_WARNING_LAMP_RED_PORT,GIO_ALIGNMENT_WARNING_LAMP_YELLOW_PIN ,LOW);//yellow
+                       CanRedHighLow(false);
+                       CanYellowHighLow(false);
                        if(CalibrationFinalSettings.counter>=3){
                            CalibrationFinalSettings.set = 0;
                            CalibrationFinalSettings.counter = 0;
@@ -1303,6 +1387,8 @@ void ControlLeds(){
 
                        }
                    }
+                   canTransmit(canREG1, canMESSAGE_BOX2, can_tx_data);
+
                }
            }//CalibrationFinalSettings
 /*************************************************************************CalibrationCancel******/
@@ -1322,8 +1408,14 @@ void ControlLeds(){
                            //printf("yellow lamp off 500 x2  //red lamp off 2saniye x1 \n");
                            CalibrationCancel.set = 0;
                            CalibrationCancel.counter = 0;
+                           canTransmit(canREG1, canMESSAGE_BOX2, can_tx_data);
+
                        }
+                       canTransmit(canREG1, canMESSAGE_BOX2, can_tx_data);
+
                    }
+                   canTransmit(canREG1, canMESSAGE_BOX2, can_tx_data);
+
                }
            }//CalibrationCancel
 /************************************************************************CalibrationFailure*****/
@@ -1336,18 +1428,20 @@ void ControlLeds(){
 
                    if(CalibrationFailure.state){
                        //printf("yellow and red lamp on x1 for 250ms\n");
-                       gioSetBit(GIO_ALIGNMENT_WARNING_LAMP_RED_PORT,GIO_ALIGNMENT_WARNING_LAMP_RED_PIN ,HIGH);//red
-                       gioSetBit(GIO_ALIGNMENT_WARNING_LAMP_YELLOW_PORT,GIO_ALIGNMENT_WARNING_LAMP_YELLOW_PIN ,HIGH);//red
+                       CanRedHighLow(true);
+                       CanYellowHighLow(true);
                        CalibrationFailure.counter++;
                    }else{
                       //printf("yellow and red lamp off x1 for 250ms\n");
-                       gioSetBit(GIO_ALIGNMENT_WARNING_LAMP_RED_PORT,GIO_ALIGNMENT_WARNING_LAMP_RED_PIN ,LOW);//red
-                       gioSetBit(GIO_ALIGNMENT_WARNING_LAMP_YELLOW_PORT,GIO_ALIGNMENT_WARNING_LAMP_YELLOW_PIN ,LOW);//red
+                       CanRedHighLow(false);
+                       CanYellowHighLow(false);
 
                        if(CalibrationFailure.counter>=1){
                            CalibrationFailure.counter = 0;
                        }
                    }
+                   canTransmit(canREG1, canMESSAGE_BOX2, can_tx_data);
+
                }//CalibrationFailure
             }//CalibrationFailure
 /************************************************************************VehicleInRoute*********/
@@ -1375,6 +1469,8 @@ void ControlLeds(){
                        }else{
                            CanYellowHighLow(false);
                        }
+                       canTransmit(canREG1, canMESSAGE_BOX2, can_tx_data);
+
                    }
                }//FifthWheelAnglePositioneRight
 
@@ -1391,6 +1487,8 @@ void ControlLeds(){
                        }else{
                            CanRedHighLow(false);
                        }
+                       canTransmit(canREG1, canMESSAGE_BOX2, can_tx_data);
+
                    }
                }//FifthWheelAnglePositioneLeft
         }
@@ -1419,12 +1517,14 @@ void modeWarning(){
                 if( Semiautomaticled.counter < 2){
                     if( Semiautomaticled.state){
 
-                        gioSetBit(GIO_ALIGNMENT_WARNING_LAMP_RED_PORT,GIO_ALIGNMENT_WARNING_LAMP_RED_PIN ,HIGH);//red
+                        CanRedHighLow(true);
+
                     }else{
-                        gioSetBit(GIO_ALIGNMENT_WARNING_LAMP_RED_PORT,GIO_ALIGNMENT_WARNING_LAMP_RED_PIN ,LOW);//red
+                        CanRedHighLow(false);
                         Semiautomaticled.counter++;
                     }
-                    canTransmit(canREG1, canMESSAGE_BOX4, can_tx_data);//id = 4
+                    canTransmit(canREG1, canMESSAGE_BOX2, can_tx_data);
+
                 }else{
                     Fullautomaticmode = false;
                     Semiautomaticmode = true;
@@ -1443,13 +1543,13 @@ void modeWarning(){
 
                 if( Fullautomaticled.counter < 2){
                     if( Fullautomaticled.state){
-
-                        gioSetBit(GIO_ALIGNMENT_WARNING_LAMP_YELLOW_PORT,GIO_ALIGNMENT_WARNING_LAMP_YELLOW_PIN ,HIGH);//red
+                        CanYellowHighLow(true);
                     }else{
-                        gioSetBit(GIO_ALIGNMENT_WARNING_LAMP_YELLOW_PORT,GIO_ALIGNMENT_WARNING_LAMP_YELLOW_PIN ,LOW);//red
+                        CanYellowHighLow(false);
                         Fullautomaticled.counter++;
                     }
-                    canTransmit(canREG1, canMESSAGE_BOX4, can_tx_data);//id = 4
+                    canTransmit(canREG1, canMESSAGE_BOX2, can_tx_data);
+
                 }else{
                     Fullautomaticmode = true;
                     Semiautomaticmode = false;
@@ -1470,7 +1570,7 @@ void semiAutomaticAutoHizalamaProcess(){
         gioSetBit(GIO_ALIGNMENT_VALF_LEFT_PORT, GIO_ALIGNMENT_VALF_LEFT_PIN,LOW);
         gioSetBit(GIO_PUMP_PORT,GIO_PUMP_PIN,LOW);
 
-        AutomaticAligmentDone.set = 5;
+        AutomaticAligmentDone.set = DELAY_250MS;
         AutomaticAligmentDone.counter =0;
         semi_Automatic_AutoAlignment = false;
 
@@ -1495,21 +1595,22 @@ void semiAutomaticAutoHizalamaProcess(){
 /*-----------------------------------------------------------semiAutomaticStandByMode---------------------------------------------------------------------------------*/
 void semiAutomaticStandByMode(){
 
-    emergency_stop = true ;
+    //emergency_stop = true ;
     gioSetBit(GIO_ALIGNMENT_VALF_LEFT_PORT, GIO_ALIGNMENT_VALF_LEFT_PIN,LOW);
     gioSetBit(GIO_ALIGNMENT_VALF_RIGHT_PORT, GIO_ALIGNMENT_VALF_RIGHT_PIN,LOW);
     gioSetBit(GIO_PUMP_PORT,GIO_PUMP_PIN,LOW);
-    gioSetBit(GIO_OIL_PUMP_PORT, GIO_OIL_PUMP_PIN,LOW);
-
+    if (systemActiveCheck()== false) {
+        gioSetBit(GIO_OIL_PUMP_PORT, GIO_OIL_PUMP_PIN,LOW);
+        can_tx_data[2] = 0;
+        canTransmit(canREG1, canMESSAGE_BOX2, can_tx_data);
+    }
     CanYellowHighLow(false);
     CanRedHighLow(false);
-    can_tx_data[2] = 0;
-    canTransmit(canREG1, canMESSAGE_BOX4, can_tx_data);//id = 4
 }
 /*-----------------------------------------------------------fullAutomaticStandBymode---------------------------------------------------------------------------------*/
 void fullAutomaticStandBymode(){
 
-    emergency_stop = true;
+    //emergency_stop = true;
     full_Automatic_AutoAlignment = false;
     full_Automatic_Set_Aligment  = false;
 
@@ -1539,7 +1640,11 @@ void fullAutomaticStandBymode(){
     gioSetBit(GIO_ALIGNMENT_VALF_LEFT_PORT, GIO_ALIGNMENT_VALF_LEFT_PIN, LOW);
     gioSetBit(GIO_ALIGNMENT_VALF_RIGHT_PORT, GIO_ALIGNMENT_VALF_RIGHT_PIN, LOW);
     gioSetBit(GIO_PUMP_PORT, GIO_PUMP_PIN,LOW);
-    gioSetBit(GIO_OIL_PUMP_PORT, GIO_OIL_PUMP_PIN,LOW);
+    if (systemActiveCheck()== false) {
+        gioSetBit(GIO_OIL_PUMP_PORT, GIO_OIL_PUMP_PIN,LOW);
+        can_tx_data[2] = 0;
+        canTransmit(canREG1, canMESSAGE_BOX2, can_tx_data);
+    }
     CanYellowHighLow(false);
     CanRedHighLow(false);
 }
@@ -1710,8 +1815,13 @@ void main(void)
 ///******************************************************************************fullAutomaticmode*****************************************************/
 
         if( Fullautomaticmode ){
+            can_tx_data[3] = 1;
+            canTransmit(canREG1, canMESSAGE_BOX2, can_tx_data);
+
             if(systemActiveCheck()&& ISSCheck()!=true){
                 gioSetBit(GIO_OIL_PUMP_PORT, GIO_OIL_PUMP_PIN, HIGH);
+                can_tx_data[2] = 255;
+                canTransmit(canREG1, canMESSAGE_BOX2, can_tx_data);
 
                 if(full_Automatic_AutoAlignment){
                     fullAutomaticAutoAlignmentProcess();
@@ -1731,7 +1841,13 @@ void main(void)
 /////******************************************************************************Semiautomaticmode*****************************************************/
 
         if(Semiautomaticmode){
+            can_tx_data[3] = 0;
+            canTransmit(canREG1, canMESSAGE_BOX2, can_tx_data);
+
             if(systemActiveCheck()&& ISSCheck()!=true){
+                can_tx_data[2] = 255;
+                canTransmit(canREG1, canMESSAGE_BOX2, can_tx_data);
+
                 gioSetBit(GIO_OIL_PUMP_PORT, GIO_OIL_PUMP_PIN, HIGH);
 
                 if( semi_Automatic_AutoAlignment ){
